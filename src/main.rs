@@ -1,5 +1,3 @@
-//NV-BDIZC
-//00110000
 extern crate hex;
 
 
@@ -40,6 +38,7 @@ impl Flag {
     fn get_flag_z(&self) -> bool { assert!(self.flag_z <= 1); return self.flag_z == 1; }
     fn get_flag_c(&self) -> bool { assert!(self.flag_n <= 1); return self.flag_c == 1; }
 
+    // NV-BDIZC
     fn print(&self){
         println!("FLAGS: N/{} V/{} B/{} D/{} I/{} Z/{} C/{}",self.flag_n, self.flag_v, self.flag_b,  self.flag_d, self.flag_i, self.flag_z, self.flag_c);
     }
@@ -57,6 +56,12 @@ impl Bus {
 
     fn write_ram(&mut self, location : u16, value : u8){
         self.ram[location as usize ] = value;
+    }
+
+    fn reset_ram(&mut self){
+        for addr in 0..65535 {
+            self.write_ram(addr, 0x00);
+        }
     }
 }
 
@@ -193,29 +198,46 @@ fn operation_NOP(cpu : & mut Cpu) -> u8 {
 fn operation_ADC(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
-    let mut sum : u16 = cpu.reg_a as u16 + cpu.fetched as u16;
-    if cpu.flag.get_flag_c(){
-        sum += 1;
-    }
+    let mut sum : u16 = cpu.reg_a as u16 + cpu.fetched as u16 + cpu.flag.flag_c as u16;
+    let sum_u8 : u8 = (sum & 0xff) as u8;
+
     cpu.flag.set_flag_c(sum > 0xff);
+    cpu.flag.set_flag_v( (!(cpu.reg_a ^ cpu.fetched) & (cpu.reg_a ^ sum_u8 )) & 0x0080 != 0);
+    cpu.flag.set_flag_z(sum_u8 == 0);
+    cpu.flag.set_flag_n(sum_u8 & 0b10000000 != 0);
 
-    cpu.reg_a = (sum & 0xff) as u8;
-
-    cpu.flag.set_flag_z(cpu.reg_a == 0);
-    cpu.flag.set_flag_n(cpu.reg_a & 0b10000000 != 0);
-
-    //TODO set v flag
-
+    cpu.reg_a = sum_u8;
     println!("ADC = {:#x}", cpu.reg_a);
     return 1;
 }
 
 fn operation_LDA(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
+    cpu.flag.set_flag_z(cpu.fetched == 0);
+    cpu.flag.set_flag_n(cpu.fetched & 0b10000000 != 0);
 
     cpu.reg_a = cpu.fetched;
-    cpu.flag.set_flag_z(cpu.reg_a == 0);
-    cpu.flag.set_flag_n(cpu.reg_a & 0b10000000 != 0);
+
+    return 1;
+}
+
+fn operation_LDX(cpu : & mut Cpu) -> u8 {
+    cpu.fetch();
+    cpu.flag.set_flag_z(cpu.fetched == 0);
+    cpu.flag.set_flag_n(cpu.fetched & 0b10000000 != 0);
+
+    cpu.reg_x = cpu.fetched;
+
+    return 1;
+}
+
+fn operation_LDY(cpu : & mut Cpu) -> u8 {
+    cpu.fetch();
+    cpu.flag.set_flag_z(cpu.fetched == 0);
+    cpu.flag.set_flag_n(cpu.fetched & 0b10000000 != 0);
+
+    cpu.reg_y = cpu.fetched;
+
     return 1;
 }
 
@@ -225,12 +247,11 @@ fn operation_STA(cpu : & mut Cpu) -> u8 {
 }
 
 
-fn operation_BNE(cpu : & mut Cpu) -> u8 {
-    println!("Relative Addr Offset = {}", cpu.relative_addr_offset);
-
+// Shared function for jumps
+fn operation_jump(cpu : &mut Cpu, do_jump_condition : bool) -> u8 {
     let mut cycle_cost : u8 = 1;
 
-    if cpu.flag.get_flag_z() == false {
+    if do_jump_condition {
         let updated_pc = (cpu.pc as i32 + cpu.relative_addr_offset as i32) as u16;
 
         if updated_pc & 0xFF00 != cpu.pc & 0xFF00 {
@@ -240,6 +261,40 @@ fn operation_BNE(cpu : & mut Cpu) -> u8 {
     }
     return cycle_cost;
 }
+
+// carry flag
+fn operation_BCS(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, cpu.flag.get_flag_c() );
+}
+
+fn operation_BCC(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, !cpu.flag.get_flag_c() );
+}
+
+// zero
+fn operation_BEQ(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, cpu.flag.get_flag_z() );
+}
+fn operation_BNE(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, !cpu.flag.get_flag_z() );
+}
+
+// negative
+fn operation_BMI(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, cpu.flag.get_flag_n() );
+}
+fn operation_BPL(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, !cpu.flag.get_flag_n());
+}
+
+// overflow
+fn operation_BVS(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, cpu.flag.get_flag_v());
+}
+fn operation_BVC(cpu : & mut Cpu) -> u8 {
+    return operation_jump( cpu, !cpu.flag.get_flag_v());
+}
+
 
 
 struct Cpu {
@@ -261,15 +316,85 @@ struct Cpu {
 
 impl Cpu {
 
+    pub fn new(mut bus: Bus) -> Self {
+        let flag = Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
+        Self {
+            bus,
+            pc: 0x0600,
+            cycles: 0,
+            reg_a: 0,
+            reg_x: 0,
+            reg_y: 0,
+            reg_sp: 0,
+            flag,
+            tick_count : 0,
+            fetched : 0,
+            opcode : Opcode {name_format: String::from("NULL"), address_mode: address_mode_NOP, operation: operation_NOP },
+            abs_addr: 0,
+            relative_addr_offset: 0
+        }
+    }
+
     fn map_to_opcode(&self, value : u8) -> Opcode{
         println!("Optcode byte: {:x}", value);
 
         return match value {
-            0x69 => Opcode { name_format: String::from("ADC #"), address_mode: address_mode_IMM, operation: operation_ADC },
+            // ADC
+            0x61 => Opcode { name_format: String::from("ADC xind"), address_mode: address_mode_XIND, operation: operation_ADC },
             0x65 => Opcode { name_format: String::from("ADC zpg"), address_mode: address_mode_ZPG, operation: operation_ADC },
+            0x69 => Opcode { name_format: String::from("ADC #"), address_mode: address_mode_IMM, operation: operation_ADC },
             0x6D => Opcode { name_format: String::from("ADC abs"), address_mode: address_mode_ABS, operation: operation_ADC },
+            0x71 => Opcode { name_format: String::from("ADC indy"), address_mode: address_mode_INDY, operation: operation_ADC },
+            0x75 => Opcode { name_format: String::from("ADC zpgx"), address_mode: address_mode_ZPX, operation: operation_ADC },
+            0x79 => Opcode { name_format: String::from("ADC absy"), address_mode: address_mode_ABSY, operation: operation_ADC },
+            0x7D => Opcode { name_format: String::from("ADC absx"), address_mode: address_mode_ABSX, operation: operation_ADC },
+
+            // STA
+            0x81 => Opcode { name_format: String::from("STA xind"), address_mode: address_mode_XIND, operation: operation_STA },
+            0x85 => Opcode { name_format: String::from("STA zpg"), address_mode: address_mode_ZPG, operation: operation_STA },
+            0x8D => Opcode { name_format: String::from("STA abs"), address_mode: address_mode_ABS, operation: operation_STA },
+            0x91 => Opcode { name_format: String::from("STA indy"), address_mode: address_mode_INDY, operation: operation_STA },
+            0x95 => Opcode { name_format: String::from("STA zpgx"), address_mode: address_mode_ZPX, operation: operation_STA },
+            0x96 => Opcode { name_format: String::from("STA zpgy"), address_mode: address_mode_ZPY, operation: operation_STA },
+            0x99 => Opcode { name_format: String::from("STA absy"), address_mode: address_mode_ABSY, operation: operation_STA },
+            0x9D => Opcode { name_format: String::from("STA absx"), address_mode: address_mode_ABSX, operation: operation_STA },
+
+            // LDA
+            0xA1 => Opcode { name_format: String::from("LDA xind"), address_mode: address_mode_XIND, operation: operation_LDA },
+            0xA5 => Opcode { name_format: String::from("LDA zpg"), address_mode: address_mode_ZPG, operation: operation_LDA },
+            0xA9 => Opcode { name_format: String::from("LDA #"), address_mode: address_mode_IMM, operation: operation_LDA },
+            0xAD => Opcode { name_format: String::from("LDA abs"), address_mode: address_mode_ABS, operation: operation_LDA },
+            0xB1 => Opcode { name_format: String::from("LDA indy"), address_mode: address_mode_INDY, operation: operation_LDA },
+            0xB5 => Opcode { name_format: String::from("LDA zpgx"), address_mode: address_mode_ZPX, operation: operation_LDA },
+            0xB9 => Opcode { name_format: String::from("LDA absy"), address_mode: address_mode_ABSY, operation: operation_LDA },
+            0xBD => Opcode { name_format: String::from("LDA absx"), address_mode: address_mode_ABSX, operation: operation_LDA },
+
+            // LDX
+            0xA2 => Opcode { name_format: String::from("LDX #"), address_mode: address_mode_IMM, operation: operation_LDX },
+            0xA6 => Opcode { name_format: String::from("LDX zpg"), address_mode: address_mode_ZPG, operation: operation_LDX },
+            0xAE => Opcode { name_format: String::from("LDX abs"), address_mode: address_mode_ABS, operation: operation_LDX },
+            0xB6 => Opcode { name_format: String::from("LDX zpgy"), address_mode: address_mode_ZPY, operation: operation_LDX },
+            0xBE => Opcode { name_format: String::from("LDX absy"), address_mode: address_mode_ABSY, operation: operation_LDX },
+
+            // LDY
+            0xA0 => Opcode { name_format: String::from("LDY #"), address_mode: address_mode_IMM, operation: operation_LDY },
+            0xA4 => Opcode { name_format: String::from("LDY zpg"), address_mode: address_mode_ZPG, operation: operation_LDY },
+            0xAC => Opcode { name_format: String::from("LDY abs"), address_mode: address_mode_ABS, operation: operation_LDY },
+            0xB4 => Opcode { name_format: String::from("LDY zpgx"), address_mode: address_mode_ZPX, operation: operation_LDY },
+            0xBC => Opcode { name_format: String::from("LDY absx"), address_mode: address_mode_ABSX, operation: operation_LDY },
+
+            // Branching
+            0x10 => Opcode { name_format: String::from("BPL rel"), address_mode: address_mode_REL, operation: operation_BPL },
+            0x30 => Opcode { name_format: String::from("BMI rel"), address_mode: address_mode_REL, operation: operation_BMI },
+            0x50 => Opcode { name_format: String::from("BVC rel"), address_mode: address_mode_REL, operation: operation_BVC },
+            0x70 => Opcode { name_format: String::from("BVS rel"), address_mode: address_mode_REL, operation: operation_BVS },
+            0x90 => Opcode { name_format: String::from("BCC rel"), address_mode: address_mode_REL, operation: operation_BCC },
+            0xB0 => Opcode { name_format: String::from("BCS rel"), address_mode: address_mode_REL, operation: operation_BCS },
             0xD0 => Opcode { name_format: String::from("BNE rel"), address_mode: address_mode_REL, operation: operation_BNE },
-            _ => Opcode { name_format: String::from("NULL"), address_mode: address_mode_NOP, operation: operation_NOP },
+            0xF0 => Opcode { name_format: String::from("BEQ rel"), address_mode: address_mode_REL, operation: operation_BEQ },
+
+            0xEA => Opcode { name_format: String::from("NULL"), address_mode: address_mode_NOP, operation: operation_NOP },
+            _ => Opcode { name_format: String::from("NULL"), address_mode: address_mode_NOP, operation: operation_NOP }, //TODO remove once we implement all instructions
         }
     }
 
@@ -310,15 +435,30 @@ impl Cpu {
         println!("Registers A/{:#x} X/{:#x} Y/{:#x} SP/{:#x} PC/{:#x}", self.reg_a, self.reg_x, self.reg_y, self.reg_sp, self.pc);
     }
 
-
-
     fn get_reg_sr(&self) -> u8 {
         return self.flag.get_sr();
+    }
+
+    fn run_until_halt(&mut self){
+        loop {
+            self.tick();
+            // TODO hack to stop the program when we hit a 00 opcode
+            if self.bus.read_ram(self.pc) == 0x00 {
+                break;
+            }
+        }
     }
 }
 
 
+/*
+Program format:
+XXXX: XX XX XX XX XX XX #somecomment \n
+XXXX: XX XX XX #somecomment \n
+*/
 fn loadProgram(bus : & mut Bus, start_address : u16, program: &str){
+    bus.reset_ram(); // resets the ram
+
     let mut lines = program.split("\n");
 
     let mut hexchars = String::with_capacity(60);
@@ -359,32 +499,38 @@ fn loadProgram(bus : & mut Bus, start_address : u16, program: &str){
     }
 }
 
+fn test_LDA(){
+    let mut bus = Bus { ram:  [0; 65536]};
+    /*
+    LDA #$00
+    LDA #$ff
+    */
+    loadProgram(&mut bus, 0x0600, "0600: a9 00 a9 80" );
+    let mut cpu = Cpu::new(bus);
+    cpu.tick();
+    assert!(cpu.flag.get_flag_z());
+    assert!(!cpu.flag.get_flag_n());
+    assert!(cpu.reg_a == 0);
+    cpu.tick();
+    cpu.tick();
+    assert!(!cpu.flag.get_flag_z());
+    assert!(cpu.flag.get_flag_n());
+    assert!(cpu.reg_a == 0x80);
+}
+
 
 fn main() {
-
+    test_LDA();
+    /*
     let mut bus = Bus { ram:  [0; 65536]};
 
     loadProgram(&mut bus, 0x0600, "0000: 65 FF 69 05 6D 00 FF 69 FF # Some comment" );
 
-    //bus.write_ram(0x0607, 0xD0); // BNE -6?
-    //bus.write_ram(0x0608, 0xF8);
-
-    //bus.write_ram(0x00FF, 0x02);
-    //bus.write_ram(0xFF00, 0xa);
-
-
-    let flag = Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
-    let mut cpu = Cpu { bus: bus, pc: 0x0600, cycles: 0, reg_a: 0, reg_x: 0, reg_y: 0, reg_sp: 0, flag: flag, tick_count : 0, fetched : 0, opcode : Opcode {name_format: String::from("NULL"), address_mode: address_mode_IMP, operation: operation_ADC }, abs_addr: 0, relative_addr_offset: 0};
-
-
-
-    loop { cpu.tick();  break; } //TODO not done
-
-    for x in 0..40 {
-        cpu.tick();
-    }
-
+    let mut cpu = Cpu::new(bus);
+    cpu.run_until_halt();
 
 
     println!("{:#010b}", cpu.reg_a);
+
+    */
 }
