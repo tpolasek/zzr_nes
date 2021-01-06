@@ -191,6 +191,11 @@ fn address_mode_REL(cpu : & mut Cpu) -> u8 {
 
 ///////////////////////////////////////////////
 
+fn set_z_n_flags(cpu : & mut Cpu, val : u8){
+    cpu.flag.set_flag_z(val == 0);
+    cpu.flag.set_flag_n(val & 0x80 != 0);
+}
+
 fn operation_NOP(cpu : & mut Cpu) -> u8 {
     return 1;
 }
@@ -203,40 +208,68 @@ fn operation_ADC(cpu : & mut Cpu) -> u8 {
 
     cpu.flag.set_flag_c(sum > 0xff);
     cpu.flag.set_flag_v( (!(cpu.reg_a ^ cpu.fetched) & (cpu.reg_a ^ sum_u8 )) & 0x0080 != 0);
-    cpu.flag.set_flag_z(sum_u8 == 0);
-    cpu.flag.set_flag_n(sum_u8 & 0b10000000 != 0);
+    set_z_n_flags(cpu, sum_u8);
 
     cpu.reg_a = sum_u8;
     println!("ADC = {:#x}", cpu.reg_a);
     return 1;
 }
 
+fn operation_AND(cpu : & mut Cpu) -> u8 {
+    cpu.fetch();
+
+    cpu.reg_a &= cpu.fetched;
+
+    set_z_n_flags(cpu, cpu.reg_a);
+    return 1;
+}
+
+fn operation_ASL(cpu : & mut Cpu) -> u8 {
+    cpu.fetch();
+
+    cpu.flag.set_flag_c(cpu.fetched & 0x80 != 0);
+
+    cpu.reg_a = cpu.fetched << 1;
+
+    set_z_n_flags(cpu, cpu.reg_a);
+    return 1;
+}
+
+fn operation_BIT(cpu : & mut Cpu) -> u8 {
+    cpu.fetch();
+
+    cpu.flag.set_flag_z(cpu.reg_a & cpu.fetched == 0x00);
+    cpu.flag.set_flag_v(cpu.fetched & (1 << 6) != 0);
+    cpu.flag.set_flag_n(cpu.fetched & (1 << 7) != 0);
+    return 1;
+}
+
+
 fn operation_LDA(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
-    cpu.flag.set_flag_z(cpu.fetched == 0);
-    cpu.flag.set_flag_n(cpu.fetched & 0b10000000 != 0);
 
     cpu.reg_a = cpu.fetched;
 
+    set_z_n_flags(cpu, cpu.reg_a);
     return 1;
 }
 
 fn operation_LDX(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
-    cpu.flag.set_flag_z(cpu.fetched == 0);
-    cpu.flag.set_flag_n(cpu.fetched & 0b10000000 != 0);
 
     cpu.reg_x = cpu.fetched;
+
+    set_z_n_flags(cpu, cpu.reg_x);
 
     return 1;
 }
 
 fn operation_LDY(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
-    cpu.flag.set_flag_z(cpu.fetched == 0);
-    cpu.flag.set_flag_n(cpu.fetched & 0b10000000 != 0);
 
     cpu.reg_y = cpu.fetched;
+
+    set_z_n_flags(cpu, cpu.reg_y);
 
     return 1;
 }
@@ -339,6 +372,23 @@ impl Cpu {
         println!("Optcode byte: {:x}", value);
 
         return match value {
+            // ASL
+            0x06 => Opcode { name_format: String::from("ASL zpg"), address_mode: address_mode_ZPG, operation: operation_ASL },
+            0x0A => Opcode { name_format: String::from("ASL zpg"), address_mode: address_mode_IMP, operation: operation_ASL },
+            0x0E => Opcode { name_format: String::from("ASL abs"), address_mode: address_mode_ABS, operation: operation_ASL },
+            0x16 => Opcode { name_format: String::from("ASL zpgx"), address_mode: address_mode_ZPX, operation: operation_ASL },
+            0x1E => Opcode { name_format: String::from("ASL absx"), address_mode: address_mode_ABSX, operation: operation_ASL },
+
+            // AND
+            0x20 => Opcode { name_format: String::from("AND xind"), address_mode: address_mode_XIND, operation: operation_AND },
+            0x25 => Opcode { name_format: String::from("AND zpg"), address_mode: address_mode_ZPG, operation: operation_AND },
+            0x29 => Opcode { name_format: String::from("AND #"), address_mode: address_mode_IMM, operation: operation_AND },
+            0x2D => Opcode { name_format: String::from("AND abs"), address_mode: address_mode_ABS, operation: operation_AND },
+            0x31 => Opcode { name_format: String::from("AND indy"), address_mode: address_mode_INDY, operation: operation_AND },
+            0x35 => Opcode { name_format: String::from("AND zpgx"), address_mode: address_mode_ZPX, operation: operation_AND },
+            0x39 => Opcode { name_format: String::from("AND absy"), address_mode: address_mode_ABSY, operation: operation_AND },
+            0x3D => Opcode { name_format: String::from("AND absx"), address_mode: address_mode_ABSX, operation: operation_AND },
+
             // ADC
             0x61 => Opcode { name_format: String::from("ADC xind"), address_mode: address_mode_XIND, operation: operation_ADC },
             0x65 => Opcode { name_format: String::from("ADC zpg"), address_mode: address_mode_ZPG, operation: operation_ADC },
@@ -392,6 +442,11 @@ impl Cpu {
             0xB0 => Opcode { name_format: String::from("BCS rel"), address_mode: address_mode_REL, operation: operation_BCS },
             0xD0 => Opcode { name_format: String::from("BNE rel"), address_mode: address_mode_REL, operation: operation_BNE },
             0xF0 => Opcode { name_format: String::from("BEQ rel"), address_mode: address_mode_REL, operation: operation_BEQ },
+
+            // Bit
+            0x24 => Opcode { name_format: String::from("BIT zpg"), address_mode: address_mode_ZPG, operation: operation_BIT },
+            0x2C => Opcode { name_format: String::from("BIT abs"), address_mode: address_mode_ABS, operation: operation_BIT },
+
 
             0xEA => Opcode { name_format: String::from("NULL"), address_mode: address_mode_NOP, operation: operation_NOP },
             _ => Opcode { name_format: String::from("NULL"), address_mode: address_mode_NOP, operation: operation_NOP }, //TODO remove once we implement all instructions
