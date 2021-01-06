@@ -74,30 +74,35 @@ struct Opcode {
 }
 
 
-fn address_mode_IMP(cpu : & mut Cpu) -> u8 {
+// GOOD
+fn address_mode_ACC(cpu : & mut Cpu) -> u8 {
     cpu.fetched = cpu.reg_a;
     return 0;
 }
 
+// GOOD
 fn address_mode_IMM(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.pc;
     cpu.pc += 1;
     return 0;
 }
 
+// GOOD
 fn address_mode_ZPG(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
     return 0;
 }
 
+// GOOD
 fn address_mode_ZPX(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.bus.read_ram(cpu.pc) as u16 + cpu.reg_x as u16;
-    cpu.abs_addr &= 0x00FF; //
+    cpu.abs_addr &= 0x00FF;
     cpu.pc += 1;
     return 0;
 }
 
+// GOOD
 fn address_mode_ZPY(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.bus.read_ram(cpu.pc) as u16 + cpu.reg_y as u16;
     cpu.abs_addr &= 0x00FF;
@@ -105,6 +110,7 @@ fn address_mode_ZPY(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
+// GOOD
 fn address_mode_ABS(cpu : & mut Cpu) -> u8 {
     let abs_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
@@ -114,6 +120,7 @@ fn address_mode_ABS(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
+// GOOD
 fn address_mode_ABSX(cpu : & mut Cpu) -> u8 {
     let abs_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
@@ -121,7 +128,7 @@ fn address_mode_ABSX(cpu : & mut Cpu) -> u8 {
     cpu.pc += 1;
 
     let temp : u32 = (abs_addr_hi << 8 | abs_addr_lo) as u32 + cpu.reg_x as u32;
-    cpu.abs_addr = (temp & 0xFFFF) as u16; //TODO verify this correct
+    cpu.abs_addr = (temp & 0xFFFF) as u16; // Assumed this is correct
 
     // changing page costs extra
     if cpu.abs_addr & 0xFF00 != abs_addr_hi << 8 {
@@ -130,6 +137,7 @@ fn address_mode_ABSX(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
+// GOOD
 fn address_mode_ABSY(cpu : & mut Cpu) -> u8 {
     let abs_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
@@ -137,7 +145,7 @@ fn address_mode_ABSY(cpu : & mut Cpu) -> u8 {
     cpu.pc += 1;
 
     let temp : u32 = (abs_addr_hi << 8 | abs_addr_lo) as u32 + cpu.reg_y as u32;
-    cpu.abs_addr = (temp & 0xFFFF) as u16; //TODO verify this correct
+    cpu.abs_addr = (temp & 0xFFFF) as u16; // Assumed this is correct
 
     // changing page costs extra
     if cpu.abs_addr & 0xFF00 != abs_addr_hi << 8 {
@@ -146,37 +154,35 @@ fn address_mode_ABSY(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
+// MAYBE ? kind of complex
 fn address_mode_IND(cpu : & mut Cpu) -> u8 {
     let  ptr_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
     let ptr_addr_hi = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
 
-    let ptr = ptr_addr_hi << 8 | ptr_addr_lo;
+    let ptr : u16 = (ptr_addr_hi << 8 | ptr_addr_lo) as u16;
+    let ptr2 : u16 = ((ptr & 0xFF00) | ((ptr + 1) & 0x00FF)) as u16; //replicate 6502 page-boundary wraparound bug
 
-    if ptr != 0xFFFF {
-        cpu.abs_addr =  (cpu.bus.read_ram(ptr + 1) as u16) << 8  | cpu.bus.read_ram(ptr) as u16;
-    }
-    else{
-        // special case, looks like the high bit gets sets to 0 //TODO verify this is actual behaviour
-        cpu.abs_addr =  cpu.bus.read_ram(0xFFFF) as u16;
-    }
+    cpu.abs_addr =  (cpu.bus.read_ram(ptr2) as u16) << 8  | cpu.bus.read_ram(ptr) as u16;
 
     return 0;
 }
 
+// GOOD
 fn address_mode_XIND(cpu : & mut Cpu) -> u8 {
-    let ptr_addr = cpu.bus.read_ram(cpu.pc) as u16;
+    let ptr_addr = (cpu.bus.read_ram(cpu.pc) as u16 + cpu.reg_x as u16) & 0xFF;
     cpu.pc += 1;
 
-    let abs_addr_lo = cpu.bus.read_ram(ptr_addr + cpu.reg_x as u16) as u16;
-    let abs_addr_hi = cpu.bus.read_ram(ptr_addr + cpu.reg_x as u16 + 1) as u16;
+    let abs_addr_lo = cpu.bus.read_ram(ptr_addr) as u16;
+    let abs_addr_hi = cpu.bus.read_ram(ptr_addr + 1) as u16;
 
-    cpu.abs_addr = abs_addr_hi << 8 | abs_addr_lo;
+    cpu.abs_addr = (abs_addr_hi << 8 | abs_addr_lo);
 
     return 0;
 }
 
+// GOOD
 fn address_mode_INDY(cpu : & mut Cpu) -> u8 {
     let ptr_addr = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
@@ -337,6 +343,63 @@ fn operation_DEX(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
+fn operation_DEY(cpu : & mut Cpu) -> u8 {
+    if cpu.reg_y == 0x00{
+        cpu.reg_y = 0xFF;
+    }
+    else{
+        cpu.reg_y -= 1;
+    }
+    set_z_n_flags(cpu, cpu.reg_y);
+    return 0;
+}
+
+fn operation_EOR(cpu : & mut Cpu) -> u8 {
+    cpu.fetch();
+    cpu.reg_a ^= cpu.fetched;
+
+    set_z_n_flags(cpu, cpu.reg_a);
+    return 0;
+}
+
+fn operation_INC(cpu : & mut Cpu) -> u8 {
+    cpu.fetch();
+
+    let mut temp :u8  = 0;
+    if cpu.fetched == 0xFF{
+        temp = 0x00;
+    }
+    else{
+        temp = cpu.fetched + 1;
+    }
+
+    cpu.bus.write_ram(cpu.abs_addr, temp);
+
+    set_z_n_flags(cpu, temp);
+    return 0;
+}
+
+fn operation_INX(cpu : & mut Cpu) -> u8 {
+    if cpu.reg_x == 0xFF{
+        cpu.reg_x = 0x00;
+    }
+    else{
+        cpu.reg_x += 1;
+    }
+    set_z_n_flags(cpu, cpu.reg_x);
+    return 0;
+}
+
+fn operation_INY(cpu : & mut Cpu) -> u8 {
+    if cpu.reg_y == 0xFF{
+        cpu.reg_y = 0x00;
+    }
+    else{
+        cpu.reg_y += 1;
+    }
+    set_z_n_flags(cpu, cpu.reg_y);
+    return 0;
+}
 
 // Shared function for jumps
 fn operation_jump(cpu : &mut Cpu, do_jump_condition : bool) -> u8 {
@@ -421,7 +484,7 @@ impl Cpu {
             flag,
             tick_count : 0,
             fetched : 0,
-            opcode : Opcode {name_format: String::from("NULL"), address_mode: address_mode_IMP, operation: operation_NOP, cycles: 2 },
+            opcode : Opcode {name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 2 },
             abs_addr: 0,
             relative_addr_offset: 0
         }
@@ -433,7 +496,7 @@ impl Cpu {
         return match value {
             // ASL
             0x06 => Opcode { name_format: String::from("ASL zpg"), address_mode: address_mode_ZPG, operation: operation_ASL, cycles: 0 },
-            0x0A => Opcode { name_format: String::from("ASL zpg"), address_mode: address_mode_IMP, operation: operation_ASL, cycles: 0 },
+            0x0A => Opcode { name_format: String::from("ASL zpg"), address_mode: address_mode_ACC, operation: operation_ASL, cycles: 0 },
             0x0E => Opcode { name_format: String::from("ASL abs"), address_mode: address_mode_ABS, operation: operation_ASL, cycles: 0 },
             0x16 => Opcode { name_format: String::from("ASL zpgx"), address_mode: address_mode_ZPX, operation: operation_ASL, cycles: 0 },
             0x1E => Opcode { name_format: String::from("ASL absx"), address_mode: address_mode_ABSX, operation: operation_ASL, cycles: 0 },
@@ -507,27 +570,46 @@ impl Cpu {
             0x2C => Opcode { name_format: String::from("BIT abs"), address_mode: address_mode_ABS, operation: operation_BIT, cycles: 0 },
 
             // Clear flags
-            0x18 => Opcode { name_format: String::from("CLC impl"), address_mode: address_mode_IMP, operation: operation_CLC, cycles: 0 },
-            0x58 => Opcode { name_format: String::from("CLI impl"), address_mode: address_mode_IMP, operation: operation_CLI, cycles: 0 },
-            0xB8 => Opcode { name_format: String::from("CLV impl"), address_mode: address_mode_IMP, operation: operation_CLV, cycles: 0 },
-            0xD8 => Opcode { name_format: String::from("CLD impl"), address_mode: address_mode_IMP, operation: operation_CLD, cycles: 0 },
+            0x18 => Opcode { name_format: String::from("CLC impl"), address_mode: address_mode_ACC, operation: operation_CLC, cycles: 0 },
+            0x58 => Opcode { name_format: String::from("CLI impl"), address_mode: address_mode_ACC, operation: operation_CLI, cycles: 0 },
+            0xB8 => Opcode { name_format: String::from("CLV impl"), address_mode: address_mode_ACC, operation: operation_CLV, cycles: 0 },
+            0xD8 => Opcode { name_format: String::from("CLD impl"), address_mode: address_mode_ACC, operation: operation_CLD, cycles: 0 },
 
             // Decrement Ops
             0xC6 => Opcode { name_format: String::from("DEC zpg"), address_mode: address_mode_ZPG, operation: operation_DEC, cycles: 0 },
             0xCE => Opcode { name_format: String::from("DEC ABS"), address_mode: address_mode_ABS, operation: operation_DEC, cycles: 0 },
             0xD6 => Opcode { name_format: String::from("DEC zpx"), address_mode: address_mode_ZPX, operation: operation_DEC, cycles: 0 },
             0xDE => Opcode { name_format: String::from("DEC absx"), address_mode: address_mode_ABSX, operation: operation_DEC, cycles: 0 },
-            0xCA => Opcode { name_format: String::from("DEX imp"), address_mode: address_mode_IMP, operation: operation_DEX, cycles: 0 },
+            0xCA => Opcode { name_format: String::from("DEX imp"), address_mode: address_mode_ACC, operation: operation_DEX, cycles: 0 },
+            0x88 => Opcode { name_format: String::from("DEY imp"), address_mode: address_mode_ACC, operation: operation_DEY, cycles: 0 },
 
+            // XOR
+            0x41 => Opcode { name_format: String::from("XOR xind"), address_mode: address_mode_XIND, operation: operation_EOR, cycles: 0 },
+            0x45 => Opcode { name_format: String::from("XOR zpg"), address_mode: address_mode_ZPG, operation: operation_EOR, cycles: 0 },
+            0x49 => Opcode { name_format: String::from("XOR #"), address_mode: address_mode_IMM, operation: operation_EOR, cycles: 0 },
+            0x4D => Opcode { name_format: String::from("XOR abs"), address_mode: address_mode_ABS, operation: operation_EOR, cycles: 0 },
+            0x51 => Opcode { name_format: String::from("XOR indy"), address_mode: address_mode_INDY, operation: operation_EOR, cycles: 0 },
+            0x55 => Opcode { name_format: String::from("XOR zpx"), address_mode: address_mode_ZPX, operation: operation_EOR, cycles: 0 },
+            0x59 => Opcode { name_format: String::from("XOR absy"), address_mode: address_mode_ABSY, operation: operation_EOR, cycles: 0 },
+            0x5D => Opcode { name_format: String::from("XOR absx"), address_mode: address_mode_ABSX, operation: operation_EOR, cycles: 0 },
 
-            0xEA => Opcode { name_format: String::from("NULL"), address_mode: address_mode_IMP, operation: operation_NOP, cycles: 0 },
-            _ => Opcode { name_format: String::from("NULL"), address_mode: address_mode_IMP, operation: operation_NOP, cycles: 0 }, //TODO remove once we implement all instructions
+            // Increment
+            0xE0 => Opcode { name_format: String::from("INC zpg"), address_mode: address_mode_ZPG, operation: operation_INC, cycles: 0 },
+            0xEE => Opcode { name_format: String::from("INC abs"), address_mode: address_mode_ABS, operation: operation_INC, cycles: 0 },
+            0xF6 => Opcode { name_format: String::from("INC zpgx"), address_mode: address_mode_ZPX, operation: operation_INC, cycles: 0 },
+            0xFE => Opcode { name_format: String::from("INC absx"), address_mode: address_mode_ABSX, operation: operation_INC, cycles: 0 },
+            0xC8 => Opcode { name_format: String::from("INY impl"), address_mode: address_mode_ACC, operation: operation_INY, cycles: 0 },
+            0xE8 => Opcode { name_format: String::from("INX impl"), address_mode: address_mode_ACC, operation: operation_INX, cycles: 0 },
+
+            
+            0xEA => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
+            _ => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 }, //TODO remove once we implement all instructions
         }
     }
 
     fn fetch(&mut self){
         // IMP address mode uses a register directly (aka no fetch)
-        if self.opcode.address_mode as usize != address_mode_IMP as usize {
+        if self.opcode.address_mode as usize != address_mode_ACC as usize {
             self.fetched = self.bus.read_ram(self.abs_addr);
         }
     }
