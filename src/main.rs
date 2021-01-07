@@ -562,7 +562,7 @@ fn operation_PHA(cpu : & mut Cpu) -> u8 {
 }
 
 fn operation_PHP(cpu : & mut Cpu) -> u8 {
-    push_stack_u8(cpu, cpu.flag.get_sr());
+    push_stack_u8(cpu, cpu.flag.get_sr() | 0x10); // FLAG BREAK
     return 0;
 }
 
@@ -640,6 +640,44 @@ fn operation_SED(cpu: & mut Cpu) -> u8 {
 
 fn operation_SEI(cpu: & mut Cpu) -> u8 {
     cpu.flag.set_flag_i(true);
+    return 0;
+}
+
+fn operation_BRK(cpu: & mut Cpu) -> u8 {
+    cpu.flag.set_flag_i(true);
+
+    push_stack_u16(cpu,cpu.pc + 1);
+    push_stack_u8(cpu, cpu.flag.get_sr() | 0x10); // FLAG BREAK
+
+    cpu.pc = cpu.bus.read_ram(0xFFFE) as u16 |  (cpu.bus.read_ram(0xFFFF) as u16) << 8;
+    return 0;
+}
+
+
+fn operation_CMP(cpu: & mut Cpu) -> u8 {
+    cpu.fetch();
+
+    cpu.flag.set_flag_c(cpu.reg_a >= cpu.fetched);
+    cpu.flag.set_flag_z(cpu.reg_a == cpu.fetched);
+    cpu.flag.set_flag_n((cpu.reg_a - cpu.fetched) & 0x80 != 0);
+    return 0;
+}
+
+fn operation_CPX(cpu: & mut Cpu) -> u8 {
+    cpu.fetch();
+
+    cpu.flag.set_flag_c(cpu.reg_x >= cpu.fetched);
+    cpu.flag.set_flag_z(cpu.reg_x == cpu.fetched);
+    cpu.flag.set_flag_n((cpu.reg_x - cpu.fetched) & 0x80 != 0);
+    return 0;
+}
+
+fn operation_CPY(cpu: & mut Cpu) -> u8 {
+    cpu.fetch();
+
+    cpu.flag.set_flag_c(cpu.reg_y >= cpu.fetched);
+    cpu.flag.set_flag_z(cpu.reg_y == cpu.fetched);
+    cpu.flag.set_flag_n((cpu.reg_y - cpu.fetched) & 0x80 != 0);
     return 0;
 }
 
@@ -865,25 +903,29 @@ impl Cpu {
             // NOP
             0xEA => Opcode { name_format: String::from("NOP"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
 
-            //TODO
-            0x00 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xC0 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xC1 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xC4 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xC5 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xC9 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xCC => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xCD => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xD1 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xD5 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xD9 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xDD => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xE0 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
+            // Interrupts
+            0x00 => Opcode { name_format: String::from("BRK"), address_mode: address_mode_ACC, operation: operation_BRK, cycles: 0 },
+
+            // Compares
+            0xC9 => Opcode { name_format: String::from("CMP imm"), address_mode: address_mode_IMM, operation: operation_CMP, cycles: 0 },
+            0xC5 => Opcode { name_format: String::from("CMP zpg"), address_mode: address_mode_ZPG, operation: operation_CMP, cycles: 0 },
+            0xD5 => Opcode { name_format: String::from("CMP zpx"), address_mode: address_mode_ZPX, operation: operation_CMP, cycles: 0 },
+            0xCD => Opcode { name_format: String::from("CMP abs"), address_mode: address_mode_ABS, operation: operation_CMP, cycles: 0 },
+            0xDD => Opcode { name_format: String::from("CMP absx"), address_mode: address_mode_ABSX, operation: operation_CMP, cycles: 0 },
+            0xD9 => Opcode { name_format: String::from("CMP absy"), address_mode: address_mode_ABSY, operation: operation_CMP, cycles: 0 },
+            0xC1 => Opcode { name_format: String::from("CMP xind"), address_mode: address_mode_XIND, operation: operation_CMP, cycles: 0 },
+            0xD1 => Opcode { name_format: String::from("CMP indy"), address_mode: address_mode_INDY, operation: operation_CMP, cycles: 0 },
+            0xE0 => Opcode { name_format: String::from("CPX imm"), address_mode: address_mode_IMM, operation: operation_CPX, cycles: 0 },
+            0xE4 => Opcode { name_format: String::from("CPX zpg"), address_mode: address_mode_ZPG, operation: operation_CPX, cycles: 0 },
+            0xEC => Opcode { name_format: String::from("CPX abs"), address_mode: address_mode_ABS, operation: operation_CPX, cycles: 0 },
+            0xC0 => Opcode { name_format: String::from("CPY imm"), address_mode: address_mode_IMM, operation: operation_CPY, cycles: 0 },
+            0xC4 => Opcode { name_format: String::from("CPY zpg"), address_mode: address_mode_ZPG, operation: operation_CPY, cycles: 0 },
+            0xCC => Opcode { name_format: String::from("CPY abs"), address_mode: address_mode_ABS, operation: operation_CPY, cycles: 0 },
+
+            // OTHER (SBC)
             0xE1 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xE4 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
             0xE5 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
             0xE9 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-            0xEC => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
             0xED => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
             0xF1 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
             0xF5 => Opcode { name_format: String::from("NULL"), address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
