@@ -55,31 +55,16 @@ impl Flag {
 
     // NV-BDIZC
     fn get_formatted_str(&self) -> String{
-        let mut output = String::with_capacity(20);
+        let mut output = String::with_capacity(10);
         output.push_str("[ ");
-        if self.get_flag_n() {
-            output.push_str("N ");
-        }
-        if self.get_flag_v() {
-            output.push_str("V ");
-        }
-        if self.get_flag_b() {
-            output.push_str("B ");
-        }
-        if self.get_flag_d() {
-            output.push_str("D ");
-        }
-        if self.get_flag_i() {
-            output.push_str("I ");
-        }
-        if self.get_flag_z() {
-            output.push_str("Z ");
-        }
-        if self.get_flag_c() {
-            output.push_str("C ");
-        }
+        if self.get_flag_n() { output.push_str("N "); }
+        if self.get_flag_v() { output.push_str("V "); }
+        if self.get_flag_b() { output.push_str("B "); }
+        if self.get_flag_d() { output.push_str("D "); }
+        if self.get_flag_i() { output.push_str("I "); }
+        if self.get_flag_z() { output.push_str("Z "); }
+        if self.get_flag_c() { output.push_str("C "); }
         output.push_str("]");
-
         return output;
     }
 }
@@ -123,8 +108,8 @@ impl Bus {
 }
 
 struct Opcode <'a>{
-    name_format : &'a str,
-    address_mode :  fn(cpu : & mut Cpu) -> u8,
+    name : &'a str,
+    addr_t :  fn(cpu : & mut Cpu) -> u8,
     operation : fn(cpu : & mut Cpu) -> u8,
     cycles : u8
 }
@@ -142,92 +127,88 @@ impl Opcode <'_>{
             addr_u16 = (cpu.bus.read_ram(pc_value +1) as u16) | ((cpu.bus.read_ram(pc_value + 2) as u16) << 8);
         }
 
-        if self.address_mode as usize == address_mode_ACC as usize {
-            return format!("{:04x}: {} {}", pc_value, self.name_format, "A");
+        if self.addr_t as usize == addr_ACC as usize {
+            return format!("{:04x}: {} {}", pc_value, self.name, "A");
         }
-        else if self.address_mode as usize == address_mode_IMP as usize {
-            return format!("{:04x}: {}", pc_value, self.name_format);
+        else if self.addr_t as usize == addr_ACC as usize {
+            return format!("{:04x}: {}", pc_value, self.name);
         }
-        else if self.address_mode as usize == address_mode_IMM as usize {
-            return format!("{:04x}: {} #${:02x}", pc_value, self.name_format, addr_u8);
+        else if self.addr_t as usize == addr_IMM as usize {
+            return format!("{:04x}: {} #${:02x}", pc_value, self.name, addr_u8);
         }
-        else if self.address_mode as usize == address_mode_ZPG as usize {
-            return format!("{:04x}: {} ${:02x}", pc_value, self.name_format, addr_u8);
+        else if self.addr_t as usize == addr_ZPG as usize {
+            return format!("{:04x}: {} ${:02x}", pc_value, self.name, addr_u8);
         }
-        else if self.address_mode as usize == address_mode_ZPX as usize {
-            return format!("{:04x}: {} ${:02x},X", pc_value, self.name_format, addr_u8);
+        else if self.addr_t as usize == addr_ZPX as usize {
+            return format!("{:04x}: {} ${:02x},X", pc_value, self.name, addr_u8);
         }
-        else if self.address_mode as usize == address_mode_ZPY as usize {
-            return format!("{:04x}: {} ${:02x},Y", pc_value, self.name_format, addr_u8);
+        else if self.addr_t as usize == addr_ZPY as usize {
+            return format!("{:04x}: {} ${:02x},Y", pc_value, self.name, addr_u8);
         }
-        else if self.address_mode as usize == address_mode_ABS as usize {
-            return format!("{:04x}: {} ${:04x}", pc_value, self.name_format, addr_u8);
+        else if self.addr_t as usize == addr_ABS as usize {
+            return format!("{:04x}: {} ${:04x}", pc_value, self.name, addr_u8);
         }
-        else if self.address_mode as usize == address_mode_ABSX as usize {
-            return format!("{:04x}: {} ${:04x},X", pc_value, self.name_format, addr_u16);
+        else if self.addr_t as usize == addr_ABX as usize {
+            return format!("{:04x}: {} ${:04x},X", pc_value, self.name, addr_u16);
         }
-        else if self.address_mode as usize == address_mode_ABSY as usize {
-            return format!("{:04x}: {} ${:04x},Y", pc_value, self.name_format, addr_u16);
+        else if self.addr_t as usize == addr_ABY as usize {
+            return format!("{:04x}: {} ${:04x},Y", pc_value, self.name, addr_u16);
         }
-        else if self.address_mode as usize == address_mode_IND as usize {
-            return format!("{:04x}: {} (${:04x})", pc_value, self.name_format, addr_u16);
+        else if self.addr_t as usize == addr_IND as usize {
+            return format!("{:04x}: {} (${:04x})", pc_value, self.name, addr_u16);
         }
-        else if self.address_mode as usize == address_mode_XIND as usize {
-            return format!("{:04x}: {} (${:02x}, X)", pc_value, self.name_format, addr_u8);
+        else if self.addr_t as usize == addr_IDX as usize {
+            return format!("{:04x}: {} (${:02x}, X)", pc_value, self.name, addr_u8);
         }
-        else if self.address_mode as usize == address_mode_INDY as usize {
-            return format!("{:04x}: {} (${:02x}), Y", pc_value, self.name_format, addr_u8);
+        else if self.addr_t as usize == addr_IDY as usize {
+            return format!("{:04x}: {} (${:02x}), Y", pc_value, self.name, addr_u8);
         }
-        else if self.address_mode as usize == address_mode_REL as usize {
+        else if self.addr_t as usize == addr_REL as usize {
             // +2 because jump is relative to the address at the end of the opcode
-            return format!("{:04x}: {} (${:04x})", pc_value, self.name_format, (pc_value as i32) + (addr_u8 as i8) as i32 + 2 );
+            return format!("{:04x}: {} (${:04x})", pc_value, self.name, (pc_value as i32) + (addr_u8 as i8) as i32 + 2 );
         }
         return String::from("???");
     }
 
-    fn is_accumulator_mode(& mut self) -> bool{
-        return self.address_mode as usize == address_mode_ACC as usize;
-    }
-
     fn get_opcode_byte_size(&self) -> u16{
         let mut byte_count : u16 = 0;
-        if self.address_mode as usize == address_mode_ACC as usize {
+        if self.addr_t as usize == addr_ACC as usize {
             byte_count = 1;
         }
-        else if self.address_mode as usize == address_mode_IMP as usize {
+        else if self.addr_t as usize == addr_ACC as usize {
             byte_count = 1;
         }
-        else if self.address_mode as usize == address_mode_IMM as usize {
+        else if self.addr_t as usize == addr_IMM as usize {
             byte_count = 2;
         }
-        else if self.address_mode as usize == address_mode_ZPG as usize {
+        else if self.addr_t as usize == addr_ZPG as usize {
             byte_count = 2;
         }
-        else if self.address_mode as usize == address_mode_ZPX as usize {
+        else if self.addr_t as usize == addr_ZPX as usize {
             byte_count = 2;
         }
-        else if self.address_mode as usize == address_mode_ZPY as usize {
+        else if self.addr_t as usize == addr_ZPY as usize {
             byte_count = 2;
         }
-        else if self.address_mode as usize == address_mode_ABS as usize {
+        else if self.addr_t as usize == addr_ABS as usize {
             byte_count = 3;
         }
-        else if self.address_mode as usize == address_mode_ABSX as usize {
+        else if self.addr_t as usize == addr_ABX as usize {
             byte_count = 3;
         }
-        else if self.address_mode as usize == address_mode_ABSY as usize {
+        else if self.addr_t as usize == addr_ABY as usize {
             byte_count = 3;
         }
-        else if self.address_mode as usize == address_mode_IND as usize {
+        else if self.addr_t as usize == addr_IND as usize {
             byte_count = 3;
         }
-        else if self.address_mode as usize == address_mode_XIND as usize {
+        else if self.addr_t as usize == addr_IDX as usize {
             byte_count = 2;
         }
-        else if self.address_mode as usize == address_mode_INDY as usize {
+        else if self.addr_t as usize == addr_IDY as usize {
             byte_count = 2;
         }
-        else if self.address_mode as usize == address_mode_REL as usize {
+        else if self.addr_t as usize == addr_REL as usize {
             byte_count = 2;
         }
 
@@ -239,31 +220,27 @@ impl Opcode <'_>{
 
 
 // GOOD
-fn address_mode_ACC(cpu : & mut Cpu) -> u8 {
+fn addr_ACC(cpu : & mut Cpu) -> u8 {
     cpu.fetched = cpu.reg_a;
     return 0;
 }
 
-fn address_mode_IMP(cpu : & mut Cpu) -> u8 {
-    return 0;
-}
-
 // GOOD
-fn address_mode_IMM(cpu : & mut Cpu) -> u8 {
+fn addr_IMM(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.pc;
     cpu.pc += 1;
     return 0;
 }
 
 // GOOD
-fn address_mode_ZPG(cpu : & mut Cpu) -> u8 {
+fn addr_ZPG(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
     return 0;
 }
 
 // GOOD
-fn address_mode_ZPX(cpu : & mut Cpu) -> u8 {
+fn addr_ZPX(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.bus.read_ram(cpu.pc) as u16 + cpu.reg_x as u16;
     cpu.abs_addr &= 0x00FF;
     cpu.pc += 1;
@@ -271,7 +248,7 @@ fn address_mode_ZPX(cpu : & mut Cpu) -> u8 {
 }
 
 // GOOD
-fn address_mode_ZPY(cpu : & mut Cpu) -> u8 {
+fn addr_ZPY(cpu : & mut Cpu) -> u8 {
     cpu.abs_addr = cpu.bus.read_ram(cpu.pc) as u16 + cpu.reg_y as u16;
     cpu.abs_addr &= 0x00FF;
     cpu.pc += 1;
@@ -279,7 +256,7 @@ fn address_mode_ZPY(cpu : & mut Cpu) -> u8 {
 }
 
 // GOOD
-fn address_mode_ABS(cpu : & mut Cpu) -> u8 {
+fn addr_ABS(cpu : & mut Cpu) -> u8 {
     let abs_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
     let abs_addr_hi = cpu.bus.read_ram(cpu.pc) as u16;
@@ -289,7 +266,7 @@ fn address_mode_ABS(cpu : & mut Cpu) -> u8 {
 }
 
 // GOOD
-fn address_mode_ABSX(cpu : & mut Cpu) -> u8 {
+fn addr_ABX(cpu : & mut Cpu) -> u8 {
     let abs_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
     let abs_addr_hi = cpu.bus.read_ram(cpu.pc) as u16;
@@ -306,7 +283,7 @@ fn address_mode_ABSX(cpu : & mut Cpu) -> u8 {
 }
 
 // GOOD
-fn address_mode_ABSY(cpu : & mut Cpu) -> u8 {
+fn addr_ABY(cpu : & mut Cpu) -> u8 {
     let abs_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
     let abs_addr_hi = cpu.bus.read_ram(cpu.pc) as u16;
@@ -323,7 +300,7 @@ fn address_mode_ABSY(cpu : & mut Cpu) -> u8 {
 }
 
 // MAYBE ? kind of complex
-fn address_mode_IND(cpu : & mut Cpu) -> u8 {
+fn addr_IND(cpu : & mut Cpu) -> u8 {
     let  ptr_addr_lo = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
     let ptr_addr_hi = cpu.bus.read_ram(cpu.pc) as u16;
@@ -338,7 +315,7 @@ fn address_mode_IND(cpu : & mut Cpu) -> u8 {
 }
 
 // GOOD
-fn address_mode_XIND(cpu : & mut Cpu) -> u8 {
+fn addr_IDX(cpu : & mut Cpu) -> u8 {
     let ptr_addr = (cpu.bus.read_ram(cpu.pc) as u16 + cpu.reg_x as u16) & 0xFF;
     cpu.pc += 1;
 
@@ -351,7 +328,7 @@ fn address_mode_XIND(cpu : & mut Cpu) -> u8 {
 }
 
 // GOOD
-fn address_mode_INDY(cpu : & mut Cpu) -> u8 {
+fn addr_IDY(cpu : & mut Cpu) -> u8 {
     let ptr_addr = cpu.bus.read_ram(cpu.pc) as u16;
     cpu.pc += 1;
 
@@ -366,7 +343,7 @@ fn address_mode_INDY(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn address_mode_REL(cpu : & mut Cpu) -> u8 {
+fn addr_REL(cpu : & mut Cpu) -> u8 {
     cpu.relative_addr_offset = cpu.bus.read_ram(cpu.pc) as i8;
     cpu.pc += 1;
     return 0;
@@ -415,11 +392,11 @@ fn set_overflow_flag(cpu : & mut Cpu, result: u16, acc : u8, mem : u8){
 ///////////////////////////////////////////////
 
 
-fn operation_NOP(_cpu : & mut Cpu) -> u8 {
+fn op_NOP(_cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_ADC(cpu : & mut Cpu) -> u8 {
+fn op_ADC(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     let sum_u16 : u16 = cpu.reg_a as u16 + cpu.fetched as u16 + cpu.flag.flag_c as u16;
@@ -434,7 +411,7 @@ fn operation_ADC(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_AND(cpu : & mut Cpu) -> u8 {
+fn op_AND(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     cpu.reg_a &= cpu.fetched;
@@ -443,7 +420,7 @@ fn operation_AND(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_BIT(cpu : & mut Cpu) -> u8 {
+fn op_BIT(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     cpu.flag.set_flag_z(cpu.reg_a & cpu.fetched == 0x00);
@@ -453,7 +430,7 @@ fn operation_BIT(cpu : & mut Cpu) -> u8 {
 }
 
 
-fn operation_LDA(cpu : & mut Cpu) -> u8 {
+fn op_LDA(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     cpu.reg_a = cpu.fetched;
@@ -462,7 +439,7 @@ fn operation_LDA(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_LDX(cpu : & mut Cpu) -> u8 {
+fn op_LDX(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     cpu.reg_x = cpu.fetched;
@@ -472,7 +449,7 @@ fn operation_LDX(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_LDY(cpu : & mut Cpu) -> u8 {
+fn op_LDY(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     cpu.reg_y = cpu.fetched;
@@ -482,77 +459,77 @@ fn operation_LDY(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_STA(cpu : & mut Cpu) -> u8 {
+fn op_STA(cpu : & mut Cpu) -> u8 {
     cpu.bus.write_ram(cpu.abs_addr, cpu.reg_a);
     return 0;
 }
 
-fn operation_STX(cpu : & mut Cpu) -> u8 {
+fn op_STX(cpu : & mut Cpu) -> u8 {
     cpu.bus.write_ram(cpu.abs_addr, cpu.reg_x);
     return 0;
 }
 
-fn operation_STY(cpu : & mut Cpu) -> u8 {
+fn op_STY(cpu : & mut Cpu) -> u8 {
     cpu.bus.write_ram(cpu.abs_addr, cpu.reg_y);
     return 0;
 }
 
-fn operation_TAX(cpu : & mut Cpu) -> u8 {
+fn op_TAX(cpu : & mut Cpu) -> u8 {
     cpu.reg_x = cpu.reg_a;
     set_z_n_flags(cpu, cpu.reg_x);
     return 0;
 }
 
-fn operation_TAY(cpu : & mut Cpu) -> u8 {
+fn op_TAY(cpu : & mut Cpu) -> u8 {
     cpu.reg_y = cpu.reg_a;
     set_z_n_flags(cpu, cpu.reg_y);
     return 0;
 }
 
-fn operation_TSX(cpu : & mut Cpu) -> u8 {
+fn op_TSX(cpu : & mut Cpu) -> u8 {
     cpu.reg_x = cpu.reg_sp;
     set_z_n_flags(cpu, cpu.reg_x);
     return 0;
 }
 
-fn operation_TXA(cpu : & mut Cpu) -> u8 {
+fn op_TXA(cpu : & mut Cpu) -> u8 {
     cpu.reg_a = cpu.reg_x;
     set_z_n_flags(cpu, cpu.reg_a);
     return 0;
 }
 
-fn operation_TXS(cpu : & mut Cpu) -> u8 {
+fn op_TXS(cpu : & mut Cpu) -> u8 {
     cpu.reg_sp = cpu.reg_x;
     return 0;
 }
 
-fn operation_TYA(cpu : & mut Cpu) -> u8 {
+fn op_TYA(cpu : & mut Cpu) -> u8 {
     cpu.reg_a = cpu.reg_y;
     set_z_n_flags(cpu, cpu.reg_a);
     return 0;
 }
 
-fn operation_CLC(cpu : & mut Cpu) -> u8 {
+fn op_CLC(cpu : & mut Cpu) -> u8 {
     cpu.flag.set_flag_c(false);
     return 0;
 }
 
-fn operation_CLD(cpu : & mut Cpu) -> u8 {
+fn op_CLD(cpu : & mut Cpu) -> u8 {
     cpu.flag.set_flag_d(false);
     return 0;
 }
 
-fn operation_CLI(cpu : & mut Cpu) -> u8 {
+fn op_CLI(cpu : & mut Cpu) -> u8 {
     cpu.flag.set_flag_i(false);
     return 0;
 }
 
-fn operation_CLV(cpu : & mut Cpu) -> u8 {
+fn op_CLV(cpu : & mut Cpu) -> u8 {
     cpu.flag.set_flag_v(false);
     return 0;
 }
 
-fn operation_DEC(cpu : & mut Cpu) -> u8 {
+fn op_DEC(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     let mut temp :u8  = 0;
@@ -569,7 +546,7 @@ fn operation_DEC(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_DEX(cpu : & mut Cpu) -> u8 {
+fn op_DEX(cpu : & mut Cpu) -> u8 {
     if cpu.reg_x == 0x00{
         cpu.reg_x = 0xFF;
     }
@@ -580,7 +557,7 @@ fn operation_DEX(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_DEY(cpu : & mut Cpu) -> u8 {
+fn op_DEY(cpu : & mut Cpu) -> u8 {
     if cpu.reg_y == 0x00{
         cpu.reg_y = 0xFF;
     }
@@ -591,7 +568,7 @@ fn operation_DEY(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_EOR(cpu : & mut Cpu) -> u8 {
+fn op_EOR(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
     cpu.reg_a ^= cpu.fetched;
 
@@ -599,7 +576,7 @@ fn operation_EOR(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_INC(cpu : & mut Cpu) -> u8 {
+fn op_INC(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     let mut temp :u8  = 0;
@@ -616,7 +593,7 @@ fn operation_INC(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_INX(cpu : & mut Cpu) -> u8 {
+fn op_INX(cpu : & mut Cpu) -> u8 {
     if cpu.reg_x == 0xFF{
         cpu.reg_x = 0x00;
     }
@@ -627,7 +604,7 @@ fn operation_INX(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_INY(cpu : & mut Cpu) -> u8 {
+fn op_INY(cpu : & mut Cpu) -> u8 {
     if cpu.reg_y == 0xFF{
         cpu.reg_y = 0x00;
     }
@@ -639,7 +616,7 @@ fn operation_INY(cpu : & mut Cpu) -> u8 {
 }
 
 // Shared function for jumps
-fn operation_jump(cpu : &mut Cpu, do_jump_condition : bool) -> u8 {
+fn op_jump(cpu : &mut Cpu, do_jump_condition : bool) -> u8 {
     let mut cycle_cost : u8 = 0;
 
     if do_jump_condition {
@@ -656,50 +633,50 @@ fn operation_jump(cpu : &mut Cpu, do_jump_condition : bool) -> u8 {
 }
 
 // carry flag
-fn operation_BCS(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, cpu.flag.get_flag_c() );
+fn op_BCS(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, cpu.flag.get_flag_c() );
 }
 
-fn operation_BCC(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, !cpu.flag.get_flag_c() );
+fn op_BCC(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, !cpu.flag.get_flag_c() );
 }
 
 // zero
-fn operation_BEQ(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, cpu.flag.get_flag_z() );
+fn op_BEQ(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, cpu.flag.get_flag_z() );
 }
-fn operation_BNE(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, !cpu.flag.get_flag_z() );
+fn op_BNE(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, !cpu.flag.get_flag_z() );
 }
 
 // negative
-fn operation_BMI(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, cpu.flag.get_flag_n() );
+fn op_BMI(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, cpu.flag.get_flag_n() );
 }
-fn operation_BPL(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, !cpu.flag.get_flag_n());
+fn op_BPL(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, !cpu.flag.get_flag_n());
 }
 
 // overflow
-fn operation_BVS(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, cpu.flag.get_flag_v());
+fn op_BVS(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, cpu.flag.get_flag_v());
 }
-fn operation_BVC(cpu : & mut Cpu) -> u8 {
-    return operation_jump( cpu, !cpu.flag.get_flag_v());
+fn op_BVC(cpu : & mut Cpu) -> u8 {
+    return op_jump( cpu, !cpu.flag.get_flag_v());
 }
 
-fn operation_JMP(cpu : & mut Cpu) -> u8 {
+fn op_JMP(cpu : & mut Cpu) -> u8 {
     cpu.pc = cpu.abs_addr;
     return 0;
 }
 
-fn operation_JSR(cpu : & mut Cpu) -> u8 {
+fn op_JSR(cpu : & mut Cpu) -> u8 {
     push_stack_u16(cpu, cpu.pc - 1);
     cpu.pc = cpu.abs_addr;
     return 0;
 }
 
-fn operation_LSR(cpu : & mut Cpu) -> u8 {
+fn op_LSR(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
     cpu.flag.set_flag_c(cpu.fetched & 0x01 != 0);
@@ -711,36 +688,36 @@ fn operation_LSR(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_ORA(cpu : & mut Cpu) -> u8 {
+fn op_ORA(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
     cpu.reg_a |= cpu.fetched;
     set_z_n_flags(cpu, cpu.reg_a);
     return 0;
 }
 
-fn operation_PHA(cpu : & mut Cpu) -> u8 {
+fn op_PHA(cpu : & mut Cpu) -> u8 {
     push_stack_u8(cpu, cpu.reg_a);
     return 0;
 }
 
-fn operation_PHP(cpu : & mut Cpu) -> u8 {
+fn op_PHP(cpu : & mut Cpu) -> u8 {
     push_stack_u8(cpu, cpu.flag.get_sr() | 0x10); // FLAG BREAK
     return 0;
 }
 
-fn operation_PLA(cpu : & mut Cpu) -> u8 {
+fn op_PLA(cpu : & mut Cpu) -> u8 {
     cpu.reg_a = pull_stack_u8(cpu);
     set_z_n_flags(cpu, cpu.reg_a);
     return 0;
 }
 
-fn operation_PLP(cpu : & mut Cpu) -> u8 {
+fn op_PLP(cpu : & mut Cpu) -> u8 {
     let sr : u8 = pull_stack_u8(cpu);
     cpu.flag.set_sr(sr);
     return 0;
 }
 
-fn operation_ROL(cpu : & mut Cpu) -> u8 {
+fn op_ROL(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
     let value : u8 = (cpu.fetched << 1) | cpu.flag.flag_c;
 
@@ -752,7 +729,7 @@ fn operation_ROL(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_ROR(cpu : & mut Cpu) -> u8 {
+fn op_ROR(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
     let value : u8 = (cpu.flag.flag_c << 7) | (cpu.fetched >> 1);
 
@@ -764,7 +741,7 @@ fn operation_ROR(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_ASL(cpu : & mut Cpu) -> u8 {
+fn op_ASL(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
     let value : u8 = cpu.fetched << 1;
 
@@ -776,7 +753,7 @@ fn operation_ASL(cpu : & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_RTI(cpu: & mut Cpu) -> u8 {
+fn op_RTI(cpu: & mut Cpu) -> u8 {
     let sr : u8 = pull_stack_u8(cpu);
     let pc : u16 = pull_stack_u16(cpu);
     cpu.flag.set_sr(sr);
@@ -784,28 +761,28 @@ fn operation_RTI(cpu: & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_RTS(cpu: & mut Cpu) -> u8 {
+fn op_RTS(cpu: & mut Cpu) -> u8 {
     let pc : u16 = pull_stack_u16(cpu);
     cpu.pc = pc + 1;
     return 0;
 }
 
-fn operation_SEC(cpu: & mut Cpu) -> u8 {
+fn op_SEC(cpu: & mut Cpu) -> u8 {
     cpu.flag.set_flag_c(true);
     return 0;
 }
 
-fn operation_SED(cpu: & mut Cpu) -> u8 {
+fn op_SED(cpu: & mut Cpu) -> u8 {
     cpu.flag.set_flag_d(true);
     return 0;
 }
 
-fn operation_SEI(cpu: & mut Cpu) -> u8 {
+fn op_SEI(cpu: & mut Cpu) -> u8 {
     cpu.flag.set_flag_i(true);
     return 0;
 }
 
-fn operation_BRK(cpu: & mut Cpu) -> u8 {
+fn op_BRK(cpu: & mut Cpu) -> u8 {
     cpu.flag.set_flag_i(true);
 
     push_stack_u16(cpu,cpu.pc + 1);
@@ -815,7 +792,7 @@ fn operation_BRK(cpu: & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_CMP(cpu: & mut Cpu) -> u8 {
+fn op_CMP(cpu: & mut Cpu) -> u8 {
     cpu.fetch();
 
 
@@ -833,7 +810,7 @@ fn operation_CMP(cpu: & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_CPX(cpu: & mut Cpu) -> u8 {
+fn op_CPX(cpu: & mut Cpu) -> u8 {
     cpu.fetch();
 
     let mut result : u8 = 0;
@@ -850,7 +827,7 @@ fn operation_CPX(cpu: & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_CPY(cpu: & mut Cpu) -> u8 {
+fn op_CPY(cpu: & mut Cpu) -> u8 {
     cpu.fetch();
 
     let mut result : u8 = 0;
@@ -867,7 +844,7 @@ fn operation_CPY(cpu: & mut Cpu) -> u8 {
     return 0;
 }
 
-fn operation_SBC(cpu: & mut Cpu) -> u8 {
+fn op_SBC(cpu: & mut Cpu) -> u8 {
     cpu.fetch();
 
     let value: u8 = cpu.fetched ^ 0xFF;
@@ -883,28 +860,24 @@ fn operation_SBC(cpu: & mut Cpu) -> u8 {
     return 0;
 }
 
-
-
-const opcode_lookup: [Opcode; 256] = [
-Opcode { name_format: "BRK", address_mode: address_mode_IMP, operation: operation_BRK, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_XIND, operation: operation_ORA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_ZPG, operation: operation_ORA, cycles: 0 },Opcode { name_format: "ASL", address_mode: address_mode_ZPG, operation: operation_ASL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "PHP", address_mode: address_mode_IMP, operation: operation_PHP, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_IMM, operation: operation_ORA, cycles: 0 },Opcode { name_format: "ASL", address_mode: address_mode_ACC, operation: operation_ASL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_ABS, operation: operation_ORA, cycles: 0 },Opcode { name_format: "ASL", address_mode: address_mode_ABS, operation: operation_ASL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BPL", address_mode: address_mode_REL, operation: operation_BPL, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_INDY, operation: operation_ORA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_ZPX, operation: operation_ORA, cycles: 0 },Opcode { name_format: "ASL", address_mode: address_mode_ZPX, operation: operation_ASL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CLC", address_mode: address_mode_IMP, operation: operation_CLC, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_ABSY, operation: operation_ORA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "ORA", address_mode: address_mode_ABSX, operation: operation_ORA, cycles: 0 },Opcode { name_format: "ASL", address_mode: address_mode_ABSX, operation: operation_ASL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "JSR", address_mode: address_mode_ABS, operation: operation_JSR, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_XIND, operation: operation_AND, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "BIT", address_mode: address_mode_ZPG, operation: operation_BIT, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_ZPG, operation: operation_AND, cycles: 0 },Opcode { name_format: "ROL", address_mode: address_mode_ZPG, operation: operation_ROL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "PLP", address_mode: address_mode_IMP, operation: operation_PLP, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_IMM, operation: operation_AND, cycles: 0 },Opcode { name_format: "ROL", address_mode: address_mode_ACC, operation: operation_ROL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "BIT", address_mode: address_mode_ABS, operation: operation_BIT, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_ABS, operation: operation_AND, cycles: 0 },Opcode { name_format: "ROL", address_mode: address_mode_ABS, operation: operation_ROL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BMI", address_mode: address_mode_REL, operation: operation_BMI, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_INDY, operation: operation_AND, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_ZPX, operation: operation_AND, cycles: 0 },Opcode { name_format: "ROL", address_mode: address_mode_ZPX, operation: operation_ROL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "SEC", address_mode: address_mode_IMP, operation: operation_SEC, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_ABSY, operation: operation_AND, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "AND", address_mode: address_mode_ABSX, operation: operation_AND, cycles: 0 },Opcode { name_format: "ROL", address_mode: address_mode_ABSX, operation: operation_ROL, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "RTI", address_mode: address_mode_IMP, operation: operation_RTI, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_XIND, operation: operation_EOR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_ZPG, operation: operation_EOR, cycles: 0 },Opcode { name_format: "LSR", address_mode: address_mode_ZPG, operation: operation_LSR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "PHA", address_mode: address_mode_IMP, operation: operation_PHA, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_IMM, operation: operation_EOR, cycles: 0 },Opcode { name_format: "LSR", address_mode: address_mode_ACC, operation: operation_LSR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "JMP", address_mode: address_mode_ABS, operation: operation_JMP, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_ABS, operation: operation_EOR, cycles: 0 },Opcode { name_format: "LSR", address_mode: address_mode_ABS, operation: operation_LSR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BVC", address_mode: address_mode_REL, operation: operation_BVC, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_INDY, operation: operation_EOR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_ZPX, operation: operation_EOR, cycles: 0 },Opcode { name_format: "LSR", address_mode: address_mode_ZPX, operation: operation_LSR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CLI", address_mode: address_mode_IMP, operation: operation_CLI, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_ABSY, operation: operation_EOR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "XOR", address_mode: address_mode_ABSX, operation: operation_EOR, cycles: 0 },Opcode { name_format: "LSR", address_mode: address_mode_ABSX, operation: operation_LSR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "RTS", address_mode: address_mode_IMP, operation: operation_RTS, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_XIND, operation: operation_ADC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_ZPG, operation: operation_ADC, cycles: 0 },Opcode { name_format: "ROR", address_mode: address_mode_ZPG, operation: operation_ROR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "PLA", address_mode: address_mode_IMP, operation: operation_PLA, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_IMM, operation: operation_ADC, cycles: 0 },Opcode { name_format: "ROR", address_mode: address_mode_ACC, operation: operation_ROR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "JMP", address_mode: address_mode_IND, operation: operation_JMP, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_ABS, operation: operation_ADC, cycles: 0 },Opcode { name_format: "ROR", address_mode: address_mode_ABS, operation: operation_ROR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BVS", address_mode: address_mode_REL, operation: operation_BVS, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_INDY, operation: operation_ADC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_ZPX, operation: operation_ADC, cycles: 0 },Opcode { name_format: "ROR", address_mode: address_mode_ZPX, operation: operation_ROR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "SEI", address_mode: address_mode_IMP, operation: operation_SEI, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_ABSY, operation: operation_ADC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "ADC", address_mode: address_mode_ABSX, operation: operation_ADC, cycles: 0 },Opcode { name_format: "ROR", address_mode: address_mode_ABSX, operation: operation_ROR, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_XIND, operation: operation_STA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "STX", address_mode: address_mode_ZPG, operation: operation_STY, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_ZPG, operation: operation_STA, cycles: 0 },Opcode { name_format: "STX", address_mode: address_mode_ZPG, operation: operation_STX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "DEY", address_mode: address_mode_IMP, operation: operation_DEY, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "TXA", address_mode: address_mode_IMP, operation: operation_TXA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "STX", address_mode: address_mode_ABS, operation: operation_STY, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_ABS, operation: operation_STA, cycles: 0 },Opcode { name_format: "STX", address_mode: address_mode_ABS, operation: operation_STX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BCC", address_mode: address_mode_REL, operation: operation_BCC, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_INDY, operation: operation_STA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "STX", address_mode: address_mode_ZPX, operation: operation_STY, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_ZPX, operation: operation_STA, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_ZPY, operation: operation_STA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "TYA", address_mode: address_mode_IMP, operation: operation_TYA, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_ABSY, operation: operation_STA, cycles: 0 },Opcode { name_format: "TXS", address_mode: address_mode_IMP, operation: operation_TXS, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "STA", address_mode: address_mode_ABSX, operation: operation_STA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "LDY", address_mode: address_mode_IMM, operation: operation_LDY, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_XIND, operation: operation_LDA, cycles: 0 },Opcode { name_format: "LDX", address_mode: address_mode_IMM, operation: operation_LDX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "LDY", address_mode: address_mode_ZPG, operation: operation_LDY, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_ZPG, operation: operation_LDA, cycles: 0 },Opcode { name_format: "LDX", address_mode: address_mode_ZPG, operation: operation_LDX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "TAY", address_mode: address_mode_IMP, operation: operation_TAY, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_IMM, operation: operation_LDA, cycles: 0 },Opcode { name_format: "TAX", address_mode: address_mode_IMP, operation: operation_TAX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "LDY", address_mode: address_mode_ABS, operation: operation_LDY, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_ABS, operation: operation_LDA, cycles: 0 },Opcode { name_format: "LDX", address_mode: address_mode_ABS, operation: operation_LDX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BCS", address_mode: address_mode_REL, operation: operation_BCS, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_INDY, operation: operation_LDA, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "LDY", address_mode: address_mode_ZPX, operation: operation_LDY, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_ZPX, operation: operation_LDA, cycles: 0 },Opcode { name_format: "LDX", address_mode: address_mode_ZPY, operation: operation_LDX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CLV", address_mode: address_mode_IMP, operation: operation_CLV, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_ABSY, operation: operation_LDA, cycles: 0 },Opcode { name_format: "TSX", address_mode: address_mode_IMP, operation: operation_TSX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "LDY", address_mode: address_mode_ABSX, operation: operation_LDY, cycles: 0 },Opcode { name_format: "LDA", address_mode: address_mode_ABSX, operation: operation_LDA, cycles: 0 },Opcode { name_format: "LDX", address_mode: address_mode_ABSY, operation: operation_LDX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "CPY", address_mode: address_mode_IMM, operation: operation_CPY, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_XIND, operation: operation_CMP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CPY", address_mode: address_mode_ZPG, operation: operation_CPY, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_ZPG, operation: operation_CMP, cycles: 0 },Opcode { name_format: "DEC", address_mode: address_mode_ZPG, operation: operation_DEC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "INY", address_mode: address_mode_IMP, operation: operation_INY, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_IMM, operation: operation_CMP, cycles: 0 },Opcode { name_format: "DEX", address_mode: address_mode_IMP, operation: operation_DEX, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CPY", address_mode: address_mode_ABS, operation: operation_CPY, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_ABS, operation: operation_CMP, cycles: 0 },Opcode { name_format: "DEC", address_mode: address_mode_ABS, operation: operation_DEC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BNE", address_mode: address_mode_REL, operation: operation_BNE, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_INDY, operation: operation_CMP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_ZPX, operation: operation_CMP, cycles: 0 },Opcode { name_format: "DEC", address_mode: address_mode_ZPX, operation: operation_DEC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CLD", address_mode: address_mode_IMP, operation: operation_CLD, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_ABSY, operation: operation_CMP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CMP", address_mode: address_mode_ABSX, operation: operation_CMP, cycles: 0 },Opcode { name_format: "DEC", address_mode: address_mode_ABSX, operation: operation_DEC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "CPX", address_mode: address_mode_IMM, operation: operation_CPX, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_ZPG, operation: operation_SBC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CPX", address_mode: address_mode_ZPG, operation: operation_CPX, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_ZPX, operation: operation_SBC, cycles: 0 },Opcode { name_format: "INC", address_mode: address_mode_ZPG, operation: operation_INC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "INX", address_mode: address_mode_IMP, operation: operation_INX, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_IMM, operation: operation_SBC, cycles: 0 },Opcode { name_format: "NOP", address_mode: address_mode_IMP, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "CPX", address_mode: address_mode_ABS, operation: operation_CPX, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_ABS, operation: operation_SBC, cycles: 0 },Opcode { name_format: "INC", address_mode: address_mode_ABS, operation: operation_INC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },
-Opcode { name_format: "BEQ", address_mode: address_mode_REL, operation: operation_BEQ, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_ABSX, operation: operation_SBC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_ABSY, operation: operation_SBC, cycles: 0 },Opcode { name_format: "INC", address_mode: address_mode_ZPX, operation: operation_INC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "SED", address_mode: address_mode_IMP, operation: operation_SED, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_XIND, operation: operation_SBC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 },Opcode { name_format: "SBC", address_mode: address_mode_INDY, operation: operation_SBC, cycles: 0 },Opcode { name_format: "INC", address_mode: address_mode_ABSX, operation: operation_INC, cycles: 0 },Opcode { name_format: "NULL", address_mode: address_mode_ACC, operation: operation_NOP, cycles: 0 }
+const OPCODE_LOOKUP: [Opcode; 256] = [
+    Opcode { name: "BRK", addr_t: addr_ACC, operation: op_BRK, cycles: 0 },Opcode { name: "ORA", addr_t: addr_IDX, operation: op_ORA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "ORA", addr_t: addr_ZPG, operation: op_ORA, cycles: 0 },Opcode { name: "ASL", addr_t: addr_ZPG, operation: op_ASL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "PHP", addr_t: addr_ACC, operation: op_PHP, cycles: 0 },Opcode { name: "ORA", addr_t: addr_IMM, operation: op_ORA, cycles: 0 },Opcode { name: "ASL", addr_t: addr_ACC, operation: op_ASL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "ORA", addr_t: addr_ABS, operation: op_ORA, cycles: 0 },Opcode { name: "ASL", addr_t: addr_ABS, operation: op_ASL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BPL", addr_t: addr_REL, operation: op_BPL, cycles: 0 },Opcode { name: "ORA", addr_t: addr_IDY, operation: op_ORA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "ORA", addr_t: addr_ZPX, operation: op_ORA, cycles: 0 },Opcode { name: "ASL", addr_t: addr_ZPX, operation: op_ASL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CLC", addr_t: addr_ACC, operation: op_CLC, cycles: 0 },Opcode { name: "ORA", addr_t: addr_ABY, operation: op_ORA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "ORA", addr_t: addr_ABX, operation: op_ORA, cycles: 0 },Opcode { name: "ASL", addr_t: addr_ABX, operation: op_ASL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "JSR", addr_t: addr_ABS, operation: op_JSR, cycles: 0 },Opcode { name: "AND", addr_t: addr_IDX, operation: op_AND, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "BIT", addr_t: addr_ZPG, operation: op_BIT, cycles: 0 },Opcode { name: "AND", addr_t: addr_ZPG, operation: op_AND, cycles: 0 },Opcode { name: "ROL", addr_t: addr_ZPG, operation: op_ROL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "PLP", addr_t: addr_ACC, operation: op_PLP, cycles: 0 },Opcode { name: "AND", addr_t: addr_IMM, operation: op_AND, cycles: 0 },Opcode { name: "ROL", addr_t: addr_ACC, operation: op_ROL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "BIT", addr_t: addr_ABS, operation: op_BIT, cycles: 0 },Opcode { name: "AND", addr_t: addr_ABS, operation: op_AND, cycles: 0 },Opcode { name: "ROL", addr_t: addr_ABS, operation: op_ROL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BMI", addr_t: addr_REL, operation: op_BMI, cycles: 0 },Opcode { name: "AND", addr_t: addr_IDY, operation: op_AND, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "AND", addr_t: addr_ZPX, operation: op_AND, cycles: 0 },Opcode { name: "ROL", addr_t: addr_ZPX, operation: op_ROL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "SEC", addr_t: addr_ACC, operation: op_SEC, cycles: 0 },Opcode { name: "AND", addr_t: addr_ABY, operation: op_AND, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "AND", addr_t: addr_ABX, operation: op_AND, cycles: 0 },Opcode { name: "ROL", addr_t: addr_ABX, operation: op_ROL, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "RTI", addr_t: addr_ACC, operation: op_RTI, cycles: 0 },Opcode { name: "XOR", addr_t: addr_IDX, operation: op_EOR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "XOR", addr_t: addr_ZPG, operation: op_EOR, cycles: 0 },Opcode { name: "LSR", addr_t: addr_ZPG, operation: op_LSR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "PHA", addr_t: addr_ACC, operation: op_PHA, cycles: 0 },Opcode { name: "XOR", addr_t: addr_IMM, operation: op_EOR, cycles: 0 },Opcode { name: "LSR", addr_t: addr_ACC, operation: op_LSR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "JMP", addr_t: addr_ABS, operation: op_JMP, cycles: 0 },Opcode { name: "XOR", addr_t: addr_ABS, operation: op_EOR, cycles: 0 },Opcode { name: "LSR", addr_t: addr_ABS, operation: op_LSR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BVC", addr_t: addr_REL, operation: op_BVC, cycles: 0 },Opcode { name: "XOR", addr_t: addr_IDY, operation: op_EOR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "XOR", addr_t: addr_ZPX, operation: op_EOR, cycles: 0 },Opcode { name: "LSR", addr_t: addr_ZPX, operation: op_LSR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CLI", addr_t: addr_ACC, operation: op_CLI, cycles: 0 },Opcode { name: "XOR", addr_t: addr_ABY, operation: op_EOR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "XOR", addr_t: addr_ABX, operation: op_EOR, cycles: 0 },Opcode { name: "LSR", addr_t: addr_ABX, operation: op_LSR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "RTS", addr_t: addr_ACC, operation: op_RTS, cycles: 0 },Opcode { name: "ADC", addr_t: addr_IDX, operation: op_ADC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "ADC", addr_t: addr_ZPG, operation: op_ADC, cycles: 0 },Opcode { name: "ROR", addr_t: addr_ZPG, operation: op_ROR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "PLA", addr_t: addr_ACC, operation: op_PLA, cycles: 0 },Opcode { name: "ADC", addr_t: addr_IMM, operation: op_ADC, cycles: 0 },Opcode { name: "ROR", addr_t: addr_ACC, operation: op_ROR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "JMP", addr_t: addr_IND, operation: op_JMP, cycles: 0 },Opcode { name: "ADC", addr_t: addr_ABS, operation: op_ADC, cycles: 0 },Opcode { name: "ROR", addr_t: addr_ABS, operation: op_ROR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BVS", addr_t: addr_REL, operation: op_BVS, cycles: 0 },Opcode { name: "ADC", addr_t: addr_IDY, operation: op_ADC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "ADC", addr_t: addr_ZPX, operation: op_ADC, cycles: 0 },Opcode { name: "ROR", addr_t: addr_ZPX, operation: op_ROR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "SEI", addr_t: addr_ACC, operation: op_SEI, cycles: 0 },Opcode { name: "ADC", addr_t: addr_ABY, operation: op_ADC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "ADC", addr_t: addr_ABX, operation: op_ADC, cycles: 0 },Opcode { name: "ROR", addr_t: addr_ABX, operation: op_ROR, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "STA", addr_t: addr_IDX, operation: op_STA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "STX", addr_t: addr_ZPG, operation: op_STY, cycles: 0 },Opcode { name: "STA", addr_t: addr_ZPG, operation: op_STA, cycles: 0 },Opcode { name: "STX", addr_t: addr_ZPG, operation: op_STX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "DEY", addr_t: addr_ACC, operation: op_DEY, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "TXA", addr_t: addr_ACC, operation: op_TXA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "STY", addr_t: addr_ABS, operation: op_STY, cycles: 0 },Opcode { name: "STA", addr_t: addr_ABS, operation: op_STA, cycles: 0 },Opcode { name: "STX", addr_t: addr_ABS, operation: op_STX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BCC", addr_t: addr_REL, operation: op_BCC, cycles: 0 },Opcode { name: "STA", addr_t: addr_IDY, operation: op_STA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "STX", addr_t: addr_ZPX, operation: op_STY, cycles: 0 },Opcode { name: "STA", addr_t: addr_ZPX, operation: op_STA, cycles: 0 },Opcode { name: "STA", addr_t: addr_ZPY, operation: op_STA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "TYA", addr_t: addr_ACC, operation: op_TYA, cycles: 0 },Opcode { name: "STA", addr_t: addr_ABY, operation: op_STA, cycles: 0 },Opcode { name: "TXS", addr_t: addr_ACC, operation: op_TXS, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "STA", addr_t: addr_ABX, operation: op_STA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "LDY", addr_t: addr_IMM, operation: op_LDY, cycles: 0 },Opcode { name: "LDA", addr_t: addr_IDX, operation: op_LDA, cycles: 0 },Opcode { name: "LDX", addr_t: addr_IMM, operation: op_LDX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "LDY", addr_t: addr_ZPG, operation: op_LDY, cycles: 0 },Opcode { name: "LDA", addr_t: addr_ZPG, operation: op_LDA, cycles: 0 },Opcode { name: "LDX", addr_t: addr_ZPG, operation: op_LDX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "TAY", addr_t: addr_ACC, operation: op_TAY, cycles: 0 },Opcode { name: "LDA", addr_t: addr_IMM, operation: op_LDA, cycles: 0 },Opcode { name: "TAX", addr_t: addr_ACC, operation: op_TAX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "LDY", addr_t: addr_ABS, operation: op_LDY, cycles: 0 },Opcode { name: "LDA", addr_t: addr_ABS, operation: op_LDA, cycles: 0 },Opcode { name: "LDX", addr_t: addr_ABS, operation: op_LDX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BCS", addr_t: addr_REL, operation: op_BCS, cycles: 0 },Opcode { name: "LDA", addr_t: addr_IDY, operation: op_LDA, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "LDY", addr_t: addr_ZPX, operation: op_LDY, cycles: 0 },Opcode { name: "LDA", addr_t: addr_ZPX, operation: op_LDA, cycles: 0 },Opcode { name: "LDX", addr_t: addr_ZPY, operation: op_LDX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CLV", addr_t: addr_ACC, operation: op_CLV, cycles: 0 },Opcode { name: "LDA", addr_t: addr_ABY, operation: op_LDA, cycles: 0 },Opcode { name: "TSX", addr_t: addr_ACC, operation: op_TSX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "LDY", addr_t: addr_ABX, operation: op_LDY, cycles: 0 },Opcode { name: "LDA", addr_t: addr_ABX, operation: op_LDA, cycles: 0 },Opcode { name: "LDX", addr_t: addr_ABY, operation: op_LDX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "CPY", addr_t: addr_IMM, operation: op_CPY, cycles: 0 },Opcode { name: "CMP", addr_t: addr_IDX, operation: op_CMP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CPY", addr_t: addr_ZPG, operation: op_CPY, cycles: 0 },Opcode { name: "CMP", addr_t: addr_ZPG, operation: op_CMP, cycles: 0 },Opcode { name: "DEC", addr_t: addr_ZPG, operation: op_DEC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "INY", addr_t: addr_ACC, operation: op_INY, cycles: 0 },Opcode { name: "CMP", addr_t: addr_IMM, operation: op_CMP, cycles: 0 },Opcode { name: "DEX", addr_t: addr_ACC, operation: op_DEX, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CPY", addr_t: addr_ABS, operation: op_CPY, cycles: 0 },Opcode { name: "CMP", addr_t: addr_ABS, operation: op_CMP, cycles: 0 },Opcode { name: "DEC", addr_t: addr_ABS, operation: op_DEC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BNE", addr_t: addr_REL, operation: op_BNE, cycles: 0 },Opcode { name: "CMP", addr_t: addr_IDY, operation: op_CMP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CMP", addr_t: addr_ZPX, operation: op_CMP, cycles: 0 },Opcode { name: "DEC", addr_t: addr_ZPX, operation: op_DEC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CLD", addr_t: addr_ACC, operation: op_CLD, cycles: 0 },Opcode { name: "CMP", addr_t: addr_ABY, operation: op_CMP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CMP", addr_t: addr_ABX, operation: op_CMP, cycles: 0 },Opcode { name: "DEC", addr_t: addr_ABX, operation: op_DEC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "CPX", addr_t: addr_IMM, operation: op_CPX, cycles: 0 },Opcode { name: "SBC", addr_t: addr_ZPG, operation: op_SBC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CPX", addr_t: addr_ZPG, operation: op_CPX, cycles: 0 },Opcode { name: "SBC", addr_t: addr_ZPX, operation: op_SBC, cycles: 0 },Opcode { name: "INC", addr_t: addr_ZPG, operation: op_INC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "INX", addr_t: addr_ACC, operation: op_INX, cycles: 0 },Opcode { name: "SBC", addr_t: addr_IMM, operation: op_SBC, cycles: 0 },Opcode { name: "NOP", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "CPX", addr_t: addr_ABS, operation: op_CPX, cycles: 0 },Opcode { name: "SBC", addr_t: addr_ABS, operation: op_SBC, cycles: 0 },Opcode { name: "INC", addr_t: addr_ABS, operation: op_INC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },
+    Opcode { name: "BEQ", addr_t: addr_REL, operation: op_BEQ, cycles: 0 },Opcode { name: "SBC", addr_t: addr_ABX, operation: op_SBC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "SBC", addr_t: addr_ABY, operation: op_SBC, cycles: 0 },Opcode { name: "INC", addr_t: addr_ZPX, operation: op_INC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "SED", addr_t: addr_ACC, operation: op_SED, cycles: 0 },Opcode { name: "SBC", addr_t: addr_IDX, operation: op_SBC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 },Opcode { name: "SBC", addr_t: addr_IDY, operation: op_SBC, cycles: 0 },Opcode { name: "INC", addr_t: addr_ABX, operation: op_INC, cycles: 0 },Opcode { name: "NUL", addr_t: addr_ACC, operation: op_NOP, cycles: 0 }
 ];
-
-
 
 struct Cpu {
     bus: Bus,
@@ -920,7 +893,7 @@ struct Cpu {
     fetched: u8,
     abs_addr: u16,
     relative_addr_offset: i8,
-    current_opcode: u8
+    is_accumulator_opcode : bool
 }
 
 impl Cpu {
@@ -941,12 +914,12 @@ impl Cpu {
             fetched : 0,
             abs_addr: 0,
             relative_addr_offset: 0,
-            current_opcode: 0
+            is_accumulator_opcode: false
         }
     }
 
     fn write_value(& mut self, value : u8){
-        if opcode_lookup[self.current_opcode as usize].is_accumulator_mode(){
+        if self.is_accumulator_opcode {
             self.reg_a = value;
         }
         else{
@@ -955,7 +928,7 @@ impl Cpu {
     }
 
     fn fetch(&mut self){
-        if !opcode_lookup[self.current_opcode as usize].is_accumulator_mode(){
+        if !self.is_accumulator_opcode {
             self.fetched = self.bus.read_ram(self.abs_addr);
         }
     }
@@ -969,28 +942,27 @@ impl Cpu {
 
         if self.cycles == 0 {
 
-
-            self.current_opcode = self.bus.read_ram(self.pc);
+            let current_opcode :u8 = self.bus.read_ram(self.pc);
             self.pc += 1;
 
+            let opcode : &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
+            self.is_accumulator_opcode = (opcode.addr_t as usize == addr_ACC as usize);
+
             //println!("Optcode byte: {:02x}", value);
-            //self.print_cpu_state();
+            self.print_cpu_state(opcode);
 
-            let addr_mode_func =  opcode_lookup[self.current_opcode as usize].address_mode;
-            let operation_func = opcode_lookup[self.current_opcode as usize].operation;
-
-            self.cycles += addr_mode_func(self);
-            self.cycles += operation_func(self);
-            self.cycles += opcode_lookup[self.current_opcode as usize].cycles;
+            self.cycles += (opcode.addr_t as fn(cpu : & mut Cpu) -> u8) (self);
+            self.cycles += (opcode.operation as fn(cpu : & mut Cpu) -> u8) (self);
+            self.cycles += opcode.cycles;
 
         }
     }
 
-    fn print_cpu_state(&self) {
-        /*println!("{:20} A={:02x} X={:02x} Y={:02x} SP={:02x} PC={:04x} {}",
-                 self.opcode.get_instruction_decoded(self, self.pc - 1),
+    fn print_cpu_state(&self, opcode :  &Opcode) {
+        println!("{:20} A={:02x} X={:02x} Y={:02x} SP={:02x} PC={:04x} {}",
+                 opcode.get_instruction_decoded(self, self.pc - 1),
                  self.reg_a, self.reg_x, self.reg_y, self.reg_sp, self.pc,
-                 self.flag.get_formatted_str());*/
+                 self.flag.get_formatted_str());
     }
 
     fn get_reg_sr(&self) -> u8 {
@@ -1082,37 +1054,24 @@ fn test_Stack(){
     cpu.bus.print_ram(0x200, 0xff);
 }
 
-fn test_loop(){
+fn test_loop(loop_count : u32){
     let mut bus = Bus { ram:  [0; 65536]};
     loadProgram(&mut bus, 0x0600, "0600: a2 00 a0 00 a9 00 e8 c8 69 01 18 90 f9" );
     let mut cpu = Cpu::new(bus);
 
     let start = Instant::now();
-    for addr in 0..1790000 {
+    for addr in 0..loop_count {
         cpu.tick();
     }
-    let elapsed = start.elapsed();
-    println!("Nano: {} ns", elapsed.as_nanos());
-    println!("Ms: {} ms", elapsed.as_millis());
 
+    let elapsed = start.elapsed();
+    println!("Ms: {}ms", elapsed.as_millis());
+    println!("Clock speed: {}mhz", ((loop_count as f32) / (elapsed.as_millis() as f32) / 1000 as f32));
 }
 
 
 fn main() {
     //test_LDA();
-    //test_Stack();
-    test_loop();
-
-    /*
-    let mut bus = Bus { ram:  [0; 65536]};
-
-    loadProgram(&mut bus, 0x0600, "0000: 65 FF 69 05 6D 00 FF 69 FF # Some comment" );
-
-    let mut cpu = Cpu::new(bus);
-    cpu.run_until_halt();
-
-
-    println!("{:#010b}", cpu.reg_a);
-
-    */
+    test_Stack();
+    //test_loop(100_000_000);
 }
