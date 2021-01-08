@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 bitflags = "1.2.1"
 hex = "0.4.2"
+minifb = "0.19.1"
+rand = "0.8.1"

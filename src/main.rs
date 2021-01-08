@@ -1,81 +1,20 @@
 #![allow(non_snake_case)]
 extern crate hex;
+mod flag;
 
 use std::time::Instant;
-
-
-struct Flag {
-    flag_n: u8,
-    flag_v: u8,
-    flag_b: u8,
-    flag_d: u8,
-    flag_i: u8,
-    flag_z: u8,
-    flag_c: u8
-}
-impl Flag {
-    fn get_sr(&self) -> u8{
-        return (self.flag_c << 0) | (self.flag_z << 1) | (self.flag_i << 2) | (self.flag_d << 3) | (self.flag_b << 4) | (1 << 5) | (self.flag_v << 6) | (self.flag_n << 7);
-    }
-
-    fn set_sr(&mut self, value : u8){
-        self.flag_c = value & (1 << 0);
-        self.flag_z = value & (1 << 1);
-        self.flag_i = value & (1 << 2);
-        self.flag_d = value & (1 << 3);
-        self.flag_b = value & (1 << 4);
-        // 5 is empty
-        self.flag_v = value & (1 << 6);
-        self.flag_n = value & (1 << 7);
-
-    }
-
-    fn bool_to_u8(&self, set : bool) -> u8 {
-        return match set {
-            true => 1,
-            false => 0
-        };
-    }
-
-    fn set_flag_n(&mut self, set : bool) { self.flag_n = self.bool_to_u8(set); }
-    fn set_flag_v(&mut self, set : bool) { self.flag_v = self.bool_to_u8(set); }
-    fn set_flag_b(&mut self, set : bool) { self.flag_b = self.bool_to_u8(set); }
-    fn set_flag_d(&mut self, set : bool) { self.flag_d = self.bool_to_u8(set); }
-    fn set_flag_i(&mut self, set : bool) { self.flag_i = self.bool_to_u8(set); }
-    fn set_flag_z(&mut self, set : bool) { self.flag_z = self.bool_to_u8(set); }
-    fn set_flag_c(&mut self, set : bool) { self.flag_c = self.bool_to_u8(set); }
-
-    fn get_flag_n(&self) -> bool { assert!(self.flag_n <= 1); return self.flag_n == 1; }
-    fn get_flag_v(&self) -> bool { assert!(self.flag_v <= 1); return self.flag_v == 1; }
-    fn get_flag_b(&self) -> bool { assert!(self.flag_b <= 1); return self.flag_b == 1; }
-    fn get_flag_d(&self) -> bool { assert!(self.flag_d <= 1); return self.flag_d == 1; }
-    fn get_flag_i(&self) -> bool { assert!(self.flag_i <= 1); return self.flag_i == 1; }
-    fn get_flag_z(&self) -> bool { assert!(self.flag_z <= 1); return self.flag_z == 1; }
-    fn get_flag_c(&self) -> bool { assert!(self.flag_n <= 1); return self.flag_c == 1; }
-
-    // NV-BDIZC
-    fn get_formatted_str(&self) -> String{
-        let mut output = String::with_capacity(10);
-        output.push_str("[ ");
-        if self.get_flag_n() { output.push_str("N "); }
-        if self.get_flag_v() { output.push_str("V "); }
-        if self.get_flag_b() { output.push_str("B "); }
-        if self.get_flag_d() { output.push_str("D "); }
-        if self.get_flag_i() { output.push_str("I "); }
-        if self.get_flag_z() { output.push_str("Z "); }
-        if self.get_flag_c() { output.push_str("C "); }
-        output.push_str("]");
-        return output;
-    }
-}
+use minifb::{Key, ScaleMode, Window, WindowOptions};
+use rand::Rng;
 
 struct Bus {
     ram: [u8; 65536]
 }
 
 impl Bus {
-
     fn read_ram(&self, location : u16) -> u8 {
+        if location == 0x00FE { //TODO remove
+            return rand::thread_rng().gen_range(0..256) as u8;
+        }
         return self.ram[location as usize];
     }
 
@@ -806,7 +745,7 @@ fn op_CMP(cpu: & mut Cpu) -> u8 {
 
     cpu.flag.set_flag_c(cpu.reg_a >= cpu.fetched);
     cpu.flag.set_flag_z(cpu.reg_a == cpu.fetched);
-    cpu.flag.set_flag_n((cpu.reg_a - cpu.fetched) & 0x80 != 0);
+    cpu.flag.set_flag_n(result & 0x80 != 0);
     return 0;
 }
 
@@ -823,7 +762,7 @@ fn op_CPX(cpu: & mut Cpu) -> u8 {
 
     cpu.flag.set_flag_c(cpu.reg_x >= cpu.fetched);
     cpu.flag.set_flag_z(cpu.reg_x == cpu.fetched);
-    cpu.flag.set_flag_n((cpu.reg_x - cpu.fetched) & 0x80 != 0);
+    cpu.flag.set_flag_n(result & 0x80 != 0);
     return 0;
 }
 
@@ -887,7 +826,7 @@ struct Cpu {
     reg_x: u8,
     reg_y: u8,
     reg_sp: u8,
-    flag: Flag,
+    flag: flag::Flag,
     // other
     tick_count: u64,
     fetched: u8,
@@ -899,7 +838,7 @@ struct Cpu {
 impl Cpu {
 
     pub fn new(bus: Bus) -> Self {
-        let flag = Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
+        let flag = flag::Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
 
         Self {
             bus,
@@ -933,7 +872,7 @@ impl Cpu {
         }
     }
 
-    fn tick(&mut self) {
+    fn tick(&mut self, print: bool) {
         self.tick_count += 1;
 
         if self.cycles > 0 {
@@ -949,7 +888,9 @@ impl Cpu {
             self.is_accumulator_opcode = (opcode.addr_t as usize == addr_ACC as usize);
 
             //println!("Optcode byte: {:02x}", value);
-            self.print_cpu_state(opcode);
+            if print {
+                self.print_cpu_state(opcode);
+            }
 
             self.cycles += (opcode.addr_t as fn(cpu : & mut Cpu) -> u8) (self);
             self.cycles += (opcode.operation as fn(cpu : & mut Cpu) -> u8) (self);
@@ -969,9 +910,9 @@ impl Cpu {
         return self.flag.get_sr();
     }
 
-    fn run_until_interrupt(&mut self){
+    fn run_until_interrupt(&mut self, print : bool){
         loop {
-            self.tick();
+            self.tick(print);
             if self.pc == 0x00 {
                 break;
             }
@@ -1035,12 +976,12 @@ fn test_LDA(){
     */
     loadProgram(&mut bus, 0x0600, "0600: a9 00 a9 80" );
     let mut cpu = Cpu::new(bus);
-    cpu.tick();
+    cpu.tick(true);
     assert!(cpu.flag.get_flag_z());
     assert!(!cpu.flag.get_flag_n());
     assert!(cpu.reg_a == 0);
-    cpu.tick();
-    cpu.tick();
+    cpu.tick(true);
+    cpu.tick(true);
     assert!(!cpu.flag.get_flag_z());
     assert!(cpu.flag.get_flag_n());
     assert!(cpu.reg_a == 0x80);
@@ -1050,8 +991,35 @@ fn test_Stack(){
     let mut bus = Bus { ram:  [0; 65536]};
     loadProgram(&mut bus, 0x0600, "0600: a2 00 a0 00 8a 99 00 02 48 e8 c8 c0 10 d0 f5 68 99 00 02 c8 c0 20 d0 f7" );
     let mut cpu = Cpu::new(bus);
-    cpu.run_until_interrupt();
+    cpu.run_until_interrupt(true);
     cpu.bus.print_ram(0x200, 0xff);
+}
+
+fn test_Snake(){
+    let mut bus = Bus { ram:  [0; 65536]};
+    loadProgram(&mut bus, 0x0600, "0600: 20 06 06 20 38 06 20 0d 06 20 2a 06 60 a9 02 85
+0610: 02 a9 04 85 03 a9 11 85 10 a9 10 85 12 a9 0f 85
+0620: 14 a9 04 85 11 85 13 85 15 60 a5 fe 85 00 a5 fe
+0630: 29 03 18 69 02 85 01 60 20 4d 06 20 8d 06 20 c3
+0640: 06 20 19 07 20 20 07 20 2d 07 4c 38 06 a5 ff c9
+0650: 77 f0 0d c9 64 f0 14 c9 73 f0 1b c9 61 f0 22 60
+0660: a9 04 24 02 d0 26 a9 01 85 02 60 a9 08 24 02 d0
+0670: 1b a9 02 85 02 60 a9 01 24 02 d0 10 a9 04 85 02
+0680: 60 a9 02 24 02 d0 05 a9 08 85 02 60 60 20 94 06
+0690: 20 a8 06 60 a5 00 c5 10 d0 0d a5 01 c5 11 d0 07
+06a0: e6 03 e6 03 20 2a 06 60 a2 02 b5 10 c5 10 d0 06
+06b0: b5 11 c5 11 f0 09 e8 e8 e4 03 f0 06 4c aa 06 4c
+06c0: 35 07 60 a6 03 ca 8a b5 10 95 12 ca 10 f9 a5 02
+06d0: 4a b0 09 4a b0 19 4a b0 1f 4a b0 2f a5 10 38 e9
+06e0: 20 85 10 90 01 60 c6 11 a9 01 c5 11 f0 28 60 e6
+06f0: 10 a9 1f 24 10 f0 1f 60 a5 10 18 69 20 85 10 b0
+0700: 01 60 e6 11 a9 06 c5 11 f0 0c 60 c6 10 a5 10 29
+0710: 1f c9 1f f0 01 60 4c 35 07 a0 00 a5 fe 91 00 60
+0720: a6 03 a9 00 81 10 a2 00 a9 01 81 10 60 a2 00 ea
+0730: ea ca d0 fb 60 " );
+    let mut cpu = Cpu::new(bus);
+    cpu.run_until_interrupt(false);
+    cpu.bus.print_ram(0x00, 0xff);
 }
 
 fn test_loop(loop_count : u32){
@@ -1061,7 +1029,7 @@ fn test_loop(loop_count : u32){
 
     let start = Instant::now();
     for addr in 0..loop_count {
-        cpu.tick();
+        cpu.tick(false);
     }
 
     let elapsed = start.elapsed();
@@ -1070,8 +1038,113 @@ fn test_loop(loop_count : u32){
 }
 
 
+const WIDTH: usize = 32*16;
+const HEIGHT: usize =  32*16;
+
 fn main() {
     //test_LDA();
-    test_Stack();
+    //test_Stack();
+    //test_Snake();
     //test_loop(100_000_000);
+
+    let mut bus = Bus { ram:  [0; 65536]};
+
+    loadProgram(&mut bus, 0x0600, "0600: 20 06 06 20 38 06 20 0d 06 20 2a 06 60 a9 02 85
+0610: 02 a9 04 85 03 a9 11 85 10 a9 10 85 12 a9 0f 85
+0620: 14 a9 04 85 11 85 13 85 15 60 a5 fe 85 00 a5 fe
+0630: 29 03 18 69 02 85 01 60 20 4d 06 20 8d 06 20 c3
+0640: 06 20 19 07 20 20 07 20 2d 07 4c 38 06 a5 ff c9
+0650: 77 f0 0d c9 64 f0 14 c9 73 f0 1b c9 61 f0 22 60
+0660: a9 04 24 02 d0 26 a9 01 85 02 60 a9 08 24 02 d0
+0670: 1b a9 02 85 02 60 a9 01 24 02 d0 10 a9 04 85 02
+0680: 60 a9 02 24 02 d0 05 a9 08 85 02 60 60 20 94 06
+0690: 20 a8 06 60 a5 00 c5 10 d0 0d a5 01 c5 11 d0 07
+06a0: e6 03 e6 03 20 2a 06 60 a2 02 b5 10 c5 10 d0 06
+06b0: b5 11 c5 11 f0 09 e8 e8 e4 03 f0 06 4c aa 06 4c
+06c0: 35 07 60 a6 03 ca 8a b5 10 95 12 ca 10 f9 a5 02
+06d0: 4a b0 09 4a b0 19 4a b0 1f 4a b0 2f a5 10 38 e9
+06e0: 20 85 10 90 01 60 c6 11 a9 01 c5 11 f0 28 60 e6
+06f0: 10 a9 1f 24 10 f0 1f 60 a5 10 18 69 20 85 10 b0
+0700: 01 60 e6 11 a9 06 c5 11 f0 0c 60 c6 10 a5 10 29
+0710: 1f c9 1f f0 01 60 4c 35 07 a0 00 a5 fe 91 00 60
+0720: a6 03 a9 00 81 10 a2 00 a9 01 81 10 60 a2 00 ea
+0730: ea ca d0 fb 60 " );
+
+    let mut cpu = Cpu::new(bus);
+
+    let mut window = Window::new(
+        "Snake - Press ESC to exit",
+        WIDTH,
+        HEIGHT,
+        WindowOptions {
+            resize: true,
+            scale_mode: ScaleMode::UpperLeft,
+            ..WindowOptions::default()
+        },
+    )
+        .expect("Unable to create window");
+
+    // Limit to max ~60 fps update rate
+    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+
+    let mut buffer: Vec<u32> = Vec::with_capacity(WIDTH * HEIGHT);
+
+    let mut size = (0, 0);
+
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        let new_size = (window.get_size().0, window.get_size().1);
+        if new_size != size {
+            size = new_size;
+            buffer.resize(size.0 * size.1, 0);
+        }
+
+        for addr in 0..200 {
+            if cpu.pc == 0x00 {
+                break;
+            }
+            cpu.tick(false);
+        }
+
+        let mut index : u32 = 0;
+        for i in buffer.iter_mut() {
+
+            let y : u32 = index / (WIDTH as u32) / 16;
+            let x : u32 = index % (WIDTH as u32) / 16;
+
+            let dest : u16 = 0x0200 + (x + y*(WIDTH as u32)/16) as u16;
+
+            if cpu.bus.read_ram(dest) != 0{
+                *i = (0xFF0000);
+            }
+            else{
+                *i = (0x00);
+            }
+
+            index+=1;
+        }
+
+        window.get_keys().map(|keys| {
+            for t in keys {
+                match t {
+                    Key::W => cpu.bus.write_ram(0x00FF, 0x77),
+                    Key::A => cpu.bus.write_ram(0x00FF, 0x61),
+                    Key::S => cpu.bus.write_ram(0x00FF, 0x73),
+                    Key::D => cpu.bus.write_ram(0x00FF, 0x64),
+                    _ => (),
+                }
+            }
+        });
+
+        window.get_keys_released().map(|keys| {
+            for t in keys {
+                match t {
+                    _ => (),
+                }
+            }
+        });
+
+        window
+            .update_with_buffer(&buffer, new_size.0, new_size.1)
+            .unwrap();
+    }
 }
