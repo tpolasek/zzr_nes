@@ -158,6 +158,21 @@ impl Opcode <'_>{
 }
 
 
+fn decrement_u8(value : u8) -> u8{
+    if value == 0 {
+        return 0xFF;
+    }
+    return value - 1;
+}
+
+fn increment_u8(value : u8) -> u8{
+    if value == 0xFF {
+        return 0;
+    }
+    return value + 1;
+}
+
+
 // GOOD
 fn addr_ACC(cpu : & mut Cpu) -> u8 {
     cpu.fetched = cpu.reg_a;
@@ -292,25 +307,28 @@ fn addr_REL(cpu : & mut Cpu) -> u8 {
 ///////////////////////////////////////////////
 fn push_stack_u16(cpu : & mut Cpu, value : u16) {
     cpu.bus.write_ram(0x100 + cpu.reg_sp as u16, ((value >> 8) & 0xFF) as u8);
-    cpu.reg_sp -= 1;
+    cpu.reg_sp = decrement_u8(cpu.reg_sp);
+
     cpu.bus.write_ram(0x100 + cpu.reg_sp as u16, (value & 0xFF) as u8);
-    cpu.reg_sp -= 1;
+    cpu.reg_sp = decrement_u8(cpu.reg_sp);
+
 }
 
 fn push_stack_u8(cpu : & mut Cpu, value : u8) {
     cpu.bus.write_ram(0x100 + cpu.reg_sp as u16, value);
-    cpu.reg_sp -= 1;
+    cpu.reg_sp = decrement_u8(cpu.reg_sp);
+
 }
 
 fn pull_stack_u8(cpu : & mut Cpu) -> u8 {
-    cpu.reg_sp += 1;
+    cpu.reg_sp = increment_u8(cpu.reg_sp);
     return cpu.bus.read_ram(0x100 + cpu.reg_sp as u16);
 }
 
 fn pull_stack_u16(cpu : & mut Cpu) -> u16 {
-    cpu.reg_sp += 1;
+    cpu.reg_sp = increment_u8(cpu.reg_sp);
     let val_lo : u16 = cpu.bus.read_ram(0x100 + cpu.reg_sp as u16) as u16;
-    cpu.reg_sp += 1;
+    cpu.reg_sp = increment_u8(cpu.reg_sp);
     let val_hi : u16 = cpu.bus.read_ram(0x100 + cpu.reg_sp as u16) as u16;
 
     return val_lo | (val_hi << 8);
@@ -471,38 +489,20 @@ fn op_CLV(cpu : & mut Cpu) -> u8 {
 fn op_DEC(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
-    let mut temp :u8  = 0;
-    if cpu.fetched == 0x00{
-        temp = 0xFF;
-    }
-    else{
-        temp = cpu.fetched - 1;
-    }
-
+    let temp :u8  = decrement_u8(cpu.fetched);
     cpu.bus.write_ram(cpu.abs_addr, temp);
-
     set_z_n_flags(cpu, temp);
     return 0;
 }
 
 fn op_DEX(cpu : & mut Cpu) -> u8 {
-    if cpu.reg_x == 0x00{
-        cpu.reg_x = 0xFF;
-    }
-    else{
-        cpu.reg_x -= 1;
-    }
+    cpu.reg_x = decrement_u8(cpu.reg_x);
     set_z_n_flags(cpu, cpu.reg_x);
     return 0;
 }
 
 fn op_DEY(cpu : & mut Cpu) -> u8 {
-    if cpu.reg_y == 0x00{
-        cpu.reg_y = 0xFF;
-    }
-    else{
-        cpu.reg_y -= 1;
-    }
+    cpu.reg_y = decrement_u8(cpu.reg_y);
     set_z_n_flags(cpu, cpu.reg_y);
     return 0;
 }
@@ -518,38 +518,20 @@ fn op_EOR(cpu : & mut Cpu) -> u8 {
 fn op_INC(cpu : & mut Cpu) -> u8 {
     cpu.fetch();
 
-    let mut temp :u8  = 0;
-    if cpu.fetched == 0xFF{
-        temp = 0x00;
-    }
-    else{
-        temp = cpu.fetched + 1;
-    }
-
+    let temp :u8  = increment_u8(cpu.fetched );
     cpu.bus.write_ram(cpu.abs_addr, temp);
-
     set_z_n_flags(cpu, temp);
     return 0;
 }
 
 fn op_INX(cpu : & mut Cpu) -> u8 {
-    if cpu.reg_x == 0xFF{
-        cpu.reg_x = 0x00;
-    }
-    else{
-        cpu.reg_x += 1;
-    }
+    cpu.reg_x = increment_u8(cpu.reg_x);
     set_z_n_flags(cpu, cpu.reg_x);
     return 0;
 }
 
 fn op_INY(cpu : & mut Cpu) -> u8 {
-    if cpu.reg_y == 0xFF{
-        cpu.reg_y = 0x00;
-    }
-    else{
-        cpu.reg_y += 1;
-    }
+    cpu.reg_y = increment_u8(cpu.reg_y);
     set_z_n_flags(cpu, cpu.reg_y);
     return 0;
 }
