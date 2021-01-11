@@ -127,7 +127,7 @@ fn test_Snake(){
             buffer.resize(size.0 * size.1, 0);
         }
 
-        for addr in 0..200 {
+        for addr in 0..400 {
             if cpu.pc == 0x00 {
                 break;
             }
@@ -207,8 +207,8 @@ const HEIGHT: usize =  32*16;
 */
 
 fn main() {
-    test_cycle_cost_with_page_jump();
+    //test_cycle_cost_with_page_jump();
     //test_Stack();
     //test_Snake();
-    //test_loop_performance(100_000_000);
+    test_loop_performance(100_000_000);
 }

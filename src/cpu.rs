@@ -140,8 +140,53 @@ impl Cpu {
         }
     }
 
-    // ---- Start of Memory Access ---- //
+    fn nmi(& mut self) -> u8 {
+        self.flag.set_flag_i(true);
+        self.flag.set_flag_b(false);
 
+        self.push_stack_u16(self.pc); // TODO verify this is right
+        self.push_stack_u8(self.flag.get_sr());
+
+        self.pc = self.bus.read_ram(0xFFFA) as u16 |  (self.bus.read_ram(0xFFFB) as u16) << 8;
+        return 8;
+    }
+
+    fn irq(& mut self) -> u8 {
+
+        if self.flag.get_flag_i(){
+            return 0;
+        }
+        // flag.i must be 0
+
+        self.flag.set_flag_i(true);
+        self.flag.set_flag_b(false);
+
+        self.push_stack_u16(self.pc); // TODO verify this is right
+        self.push_stack_u8(self.flag.get_sr());
+
+        // Same as BRK
+        self.pc = self.bus.read_ram(0xFFFE) as u16 |  (self.bus.read_ram(0xFFFF) as u16) << 8;
+        return 7;
+    }
+
+    fn reset(& mut self) -> u8 {
+        self.pc = self.bus.read_ram(0xFFFC) as u16 |  (self.bus.read_ram(0xFFFD) as u16) << 8;
+
+        self.reg_a = 0;
+        self.reg_x = 0;
+        self.reg_y = 0;
+        self.reg_sp = 0xFD;
+        self.flag.set_sr(0);
+
+        self.abs_addr = 0x0000;
+        self.relative_addr_offset = 0x00;
+        self.fetched = 0x00;
+
+        return 8;
+    }
+
+
+        // ---- Start of Memory Access ---- //
 
     // GOOD
     fn addr_ACC(& mut self) -> u8 {
@@ -315,7 +360,6 @@ impl Cpu {
     }
 
     // ---- Start of Opcodes ---- //
-
 
     fn op_NOP(& mut self) -> u8 {
         return 0;
@@ -742,7 +786,7 @@ impl Cpu {
     fn op_BRK(& mut self) -> u8 {
         self.flag.set_flag_i(true);
 
-        self.push_stack_u16(self.pc + 1);
+        self.push_stack_u16(self.pc + 1); // TODO verify this is right
         self.push_stack_u8(self.flag.get_sr() | 0x10); // FLAG BREAK
 
         self.pc = self.bus.read_ram(0xFFFE) as u16 |  (self.bus.read_ram(0xFFFF) as u16) << 8;
