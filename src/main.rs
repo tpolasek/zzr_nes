@@ -6,23 +6,65 @@ mod bus;
 use std::time::Instant;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
 
-fn test_LDA(){
+fn test_cycle_cost_with_page_jump(){
     let mut bus = bus::Bus { ram:  [0; 65536]};
     /*
+    LDA #$02
+    STA $0201
+    TAX
+    ADC $01FF,X
+    TAX
+    ADC $01FF,X
     LDA #$00
-    LDA #$80
     */
-    bus.loadProgram(0x0600, "0600: a9 00 a9 80" );
+    bus.loadProgram(0x0600, "0600: a9 02 8d 01 02 aa 7d ff 01 aa 7d ff 01 a9 00 " );
     let mut cpu = cpu::Cpu::new(bus);
-    cpu.tick(true);
-    assert!(cpu.flag.get_flag_z());
-    assert!(!cpu.flag.get_flag_n());
-    assert!(cpu.reg_a == 0);
+
     cpu.tick(true);
     cpu.tick(true);
     assert!(!cpu.flag.get_flag_z());
-    assert!(cpu.flag.get_flag_n());
-    assert!(cpu.reg_a == 0x80);
+    assert!(!cpu.flag.get_flag_n());
+    assert!(cpu.reg_a == 2);
+
+    assert!(cpu.bus.read_ram(0x0201) == 0);
+
+    // STA $0201
+    cpu.tick(true);
+    cpu.tick(true);
+    cpu.tick(true);
+    assert!(cpu.bus.read_ram(0x0201) == 2);
+    assert!(cpu.reg_x == 0);
+
+    //TAX
+    cpu.tick(true);
+    cpu.tick(true);
+    assert!(cpu.reg_x == 2);
+
+    // ADC $01FF,X  --- 5 cycles because page jump
+    cpu.tick(true);
+    cpu.tick(true);
+    cpu.tick(true);
+    cpu.tick(true);
+    cpu.tick(true);
+    assert!(cpu.reg_a == 4);
+
+    //TAX
+    cpu.tick(true);
+    cpu.tick(true);
+    assert!(cpu.reg_x == 4);
+
+    // ADC $01FF,X  --- 4 cycles no page jump
+    cpu.tick(true);
+    cpu.tick(true);
+    cpu.tick(true);
+    cpu.tick(true);
+    cpu.tick(true);
+    assert!(cpu.reg_a == 4);
+
+    //    LDA #$00
+    cpu.tick(true);
+    cpu.tick(true);
+    assert!(cpu.reg_a == 0);
 }
 
 fn test_Stack(){
@@ -157,7 +199,6 @@ const HEIGHT: usize =  32*16;
 
 /*
 --- TODO LIST ---
-- Add cycle counts to Opcode table
 - Add NMI
 - Add tests checking cycle counting (and it should also check crossing memory page boundaries)
 - Add ppU register memory (and pre-write memory) to bus (the plan is to have the cpu pre-emptively write to a cached register, that gets written to once all cpu cycles are done for an instruction)
@@ -166,8 +207,8 @@ const HEIGHT: usize =  32*16;
 */
 
 fn main() {
-    //test_LDA();
+    test_cycle_cost_with_page_jump();
     //test_Stack();
     //test_Snake();
-    test_loop_performance(100_000_000);
+    //test_loop_performance(100_000_000);
 }
