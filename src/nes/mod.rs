@@ -12,7 +12,7 @@ use bus::Bus;
 use cpu::Cpu;
 use ppu::Ppu;
 use rom::Rom;
-
+use controller::*;
 
 pub struct Nes {
     cpu: cpu::Cpu,
@@ -108,10 +108,10 @@ impl Nes {
             window.get_keys().map(|keys| {
                 for t in keys {
                     match t {
-                        Key::W => self.cpu.bus.write_ram(0x00FF, 0x77),
-                        Key::A => self.cpu.bus.write_ram(0x00FF, 0x61),
-                        Key::S => self.cpu.bus.write_ram(0x00FF, 0x73),
-                        Key::D => self.cpu.bus.write_ram(0x00FF, 0x64),
+                        Key::W => self.cpu.bus.controller.pressed(Button::UP),
+                        Key::A => self.cpu.bus.controller.pressed(Button::LEFT),
+                        Key::S => self.cpu.bus.controller.pressed(Button::DOWN),
+                        Key::D => self.cpu.bus.controller.pressed(Button::RIGHT),
                         _ => (),
                     }
                 }
@@ -120,6 +120,10 @@ impl Nes {
             window.get_keys_released().map(|keys| {
                 for t in keys {
                     match t {
+                        Key::W => self.cpu.bus.controller.released(Button::UP),
+                        Key::A => self.cpu.bus.controller.released(Button::LEFT),
+                        Key::S => self.cpu.bus.controller.released(Button::DOWN),
+                        Key::D => self.cpu.bus.controller.released(Button::RIGHT),
                         _ => (),
                     }
                 }

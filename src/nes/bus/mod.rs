@@ -16,7 +16,7 @@ impl Bus {
     pub fn new() -> Self {
         Self {
            ram2k : Ram2k { memory: [0; 0x10000] }, // todo make this actually 2k
-           controller: Controller {},
+           controller: Controller::new(),
            rom: Rom { prg1: [0; 0x4000] },
            ppu: Ppu {}
         }
@@ -25,9 +25,12 @@ impl Bus {
     pub fn read_ram(&self, location : u16) -> u8 {
         return match location {
             0x00FE => rand::thread_rng().gen_range(0..256) as u8,
+            0x00FF => self.controller.read(),
             0x0600..=0x45FF => self.rom.prg1[(location - 0x0600) as usize],
             _ => self.ram2k.memory[location as usize]
         };
+
+
     }
 
     pub fn write_ram(&mut self, location : u16, value : u8){
