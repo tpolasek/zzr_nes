@@ -1,19 +1,40 @@
+use super::controller::Controller;
+use super::ram2k::Ram2k;
+use super::rom::Rom;
+use super::ppu::Ppu;
+
 use rand::Rng;
 
 pub struct Bus {
-    pub ram: [u8; 65536]
+    pub ram2k: Ram2k,
+    pub controller: Controller,
+    pub rom: Rom,
+    pub ppu: Ppu,
 }
 
 impl Bus {
-    pub fn read_ram(&self, location : u16) -> u8 {
-        if location == 0x00FE { //TODO remove
-            return rand::thread_rng().gen_range(0..256) as u8;
+    pub fn new() -> Self {
+        Self {
+           ram2k : Ram2k { memory: [0; 0x10000] }, // todo make this actually 2k
+           controller: Controller {},
+           rom: Rom { prg1: [0; 0x4000] },
+           ppu: Ppu {}
         }
-        return self.ram[location as usize];
+    }
+
+    pub fn read_ram(&self, location : u16) -> u8 {
+        return match location {
+            0x00FE => rand::thread_rng().gen_range(0..256) as u8,
+            0x0600..=0x45FF => self.rom.prg1[(location - 0x0600) as usize],
+            _ => self.ram2k.memory[location as usize]
+        };
     }
 
     pub fn write_ram(&mut self, location : u16, value : u8){
-        self.ram[location as usize ] = value;
+        match location {
+            0x0600..=0x45FF => self.rom.prg1[(location - 0x0600) as usize] = value,
+            _ =>  self.ram2k.memory[location as usize] = value
+        }
     }
 
     pub fn reset_ram(&mut self){
@@ -39,46 +60,5 @@ impl Bus {
         }
     }
 
-    pub fn loadProgram(& mut self, start_address : u16, program: &str){
-        self.reset_ram(); // resets the ram
 
-        let lines = program.split("\n");
-
-        let mut hexchars = String::with_capacity(60);
-
-        for line in lines {
-            let char_vec: Vec<char> = line.chars().collect();
-            let mut foundColon : bool = false;
-            for c in char_vec {
-                if c == ' '{
-                    continue;
-                }
-                if c == '#' {
-                    break;
-                }
-
-                if c == '\n'{
-                    break;
-                }
-                if c == ':' {
-                    foundColon = true;
-                    continue;
-                }
-                if !foundColon {
-                    continue;
-                }
-
-                hexchars.push(c);
-
-            }
-        }
-
-        let hex_bytes = hex::decode(hexchars).expect("Decoding failed");
-
-        let mut address : u16 = start_address;
-        for hex in hex_bytes {
-            self.write_ram(address, hex);
-            address += 1;
-        }
-    }
 }

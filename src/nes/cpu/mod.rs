@@ -53,11 +53,11 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new(bus: Bus) -> Self {
+    pub fn new() -> Self {
         let flag = flag::Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
 
         Self {
-            bus,
+            bus: Bus::new(),
             pc: 0x0600,
             cycles: 0,
             reg_a: 0,
