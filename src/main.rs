@@ -1,8 +1,9 @@
 #![allow(non_snake_case)]
 extern crate hex;
-mod cpu;
-mod bus;
+mod nes;
+use nes::Nes;
 
+/*
 use std::time::Instant;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
 
@@ -67,13 +68,6 @@ fn test_cycle_cost_with_page_jump(){
     assert!(cpu.reg_a == 0);
 }
 
-fn test_Stack(){
-    let mut bus = bus::Bus { ram:  [0; 65536]};
-    bus.loadProgram(0x0600, "0600: a2 00 a0 00 8a 99 00 02 48 e8 c8 c0 10 d0 f5 68 99 00 02 c8 c0 20 d0 f7" );
-    let mut cpu = cpu::Cpu::new(bus);
-    cpu.run_until_interrupt(true);
-    cpu.bus.print_ram(0x200, 0xff);
-}
 
 fn test_Snake(){
     let mut bus = bus::Bus { ram:  [0; 65536]};
@@ -177,30 +171,11 @@ fn test_Snake(){
             .unwrap();
     }
 }
-
-fn test_loop_performance(loop_count : u32){
-    let mut bus = bus::Bus { ram:  [0; 65536]};
-    bus.loadProgram( 0x0600, "0600: a2 00 a0 00 a9 00 e8 c8 69 01 18 90 f9" );
-    let mut cpu = cpu::Cpu::new(bus);
-
-    let start = Instant::now();
-    for addr in 0..loop_count {
-        cpu.tick(false);
-    }
-
-    let elapsed = start.elapsed();
-    println!("Ms: {}ms", elapsed.as_millis());
-    println!("Clock speed: {}mhz", ((loop_count as f32) / (elapsed.as_millis() as f32) / 1000 as f32));
-}
-
-
 const WIDTH: usize = 32*16;
 const HEIGHT: usize =  32*16;
 
 /*
 --- TODO LIST ---
-- Add NMI
-- Add tests checking cycle counting (and it should also check crossing memory page boundaries)
 - Add ppU register memory (and pre-write memory) to bus (the plan is to have the cpu pre-emptively write to a cached register, that gets written to once all cpu cycles are done for an instruction)
 - Setup cpu debugging GUI code (consider using https://crates.io/crates/ncurses)
 - Setup classes for PPU and controller input, and main loop
@@ -211,4 +186,11 @@ fn main() {
     //test_Stack();
     //test_Snake();
     test_loop_performance(100_000_000);
+}
+
+*/
+fn main() {
+    let mut nes = Nes::new();
+    nes.test_stack();
+    nes.test_loop_performance(100_000_000);
 }

@@ -16,7 +16,7 @@ impl Bus {
         self.ram[location as usize ] = value;
     }
 
-    fn reset_ram(&mut self){
+    pub fn reset_ram(&mut self){
         for addr in 0..65535 {
             self.write_ram(addr, 0x00);
         }
@@ -38,6 +38,7 @@ impl Bus {
             counter+=1;
         }
     }
+
     pub fn loadProgram(& mut self, start_address : u16, program: &str){
         self.reset_ram(); // resets the ram
 

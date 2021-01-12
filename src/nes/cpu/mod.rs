@@ -1,5 +1,5 @@
-mod flag;
-use crate::bus;
+pub mod flag;
+use super::bus::Bus;
 
 fn decrement_u8(value : u8) -> u8{
     if value == 0 {
@@ -16,7 +16,7 @@ fn increment_u8(value : u8) -> u8{
 }
 
 ///////////////////////////////////////////////
-const OPCODE_LOOKUP: [Opcode; 256] = [
+static OPCODE_LOOKUP: [Opcode; 256] = [
     Opcode { name: "BRK", addr_t: Cpu::addr_ACC, operation: Cpu::op_BRK, cycles: 7 },Opcode { name: "ORA", addr_t: Cpu::addr_IDX, operation: Cpu::op_ORA, cycles: 6 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 2 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 8 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 3 },Opcode { name: "ORA", addr_t: Cpu::addr_ZPG, operation: Cpu::op_ORA, cycles: 3 },Opcode { name: "ASL", addr_t: Cpu::addr_ZPG, operation: Cpu::op_ASL, cycles: 5 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 5 },Opcode { name: "PHP", addr_t: Cpu::addr_ACC, operation: Cpu::op_PHP, cycles: 3 },Opcode { name: "ORA", addr_t: Cpu::addr_IMM, operation: Cpu::op_ORA, cycles: 2 },Opcode { name: "ASL", addr_t: Cpu::addr_ACC, operation: Cpu::op_ASL, cycles: 2 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 2 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 4 },Opcode { name: "ORA", addr_t: Cpu::addr_ABS, operation: Cpu::op_ORA, cycles: 4 },Opcode { name: "ASL", addr_t: Cpu::addr_ABS, operation: Cpu::op_ASL, cycles: 6 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 6 },
     Opcode { name: "BPL", addr_t: Cpu::addr_REL, operation: Cpu::op_BPL, cycles: 2 },Opcode { name: "ORA", addr_t: Cpu::addr_IDY, operation: Cpu::op_ORA, cycles: 5 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 2 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 8 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 4 },Opcode { name: "ORA", addr_t: Cpu::addr_ZPX, operation: Cpu::op_ORA, cycles: 4 },Opcode { name: "ASL", addr_t: Cpu::addr_ZPX, operation: Cpu::op_ASL, cycles: 6 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 6 },Opcode { name: "CLC", addr_t: Cpu::addr_ACC, operation: Cpu::op_CLC, cycles: 2 },Opcode { name: "ORA", addr_t: Cpu::addr_ABY, operation: Cpu::op_ORA, cycles: 4 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 2 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 7 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 4 },Opcode { name: "ORA", addr_t: Cpu::addr_ABX, operation: Cpu::op_ORA, cycles: 4 },Opcode { name: "ASL", addr_t: Cpu::addr_ABX, operation: Cpu::op_ASL, cycles: 7 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 7 },
     Opcode { name: "JSR", addr_t: Cpu::addr_ABS, operation: Cpu::op_JSR, cycles: 6 },Opcode { name: "AND", addr_t: Cpu::addr_IDX, operation: Cpu::op_AND, cycles: 6 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 2 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 8 },Opcode { name: "BIT", addr_t: Cpu::addr_ZPG, operation: Cpu::op_BIT, cycles: 3 },Opcode { name: "AND", addr_t: Cpu::addr_ZPG, operation: Cpu::op_AND, cycles: 3 },Opcode { name: "ROL", addr_t: Cpu::addr_ZPG, operation: Cpu::op_ROL, cycles: 5 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 5 },Opcode { name: "PLP", addr_t: Cpu::addr_ACC, operation: Cpu::op_PLP, cycles: 4 },Opcode { name: "AND", addr_t: Cpu::addr_IMM, operation: Cpu::op_AND, cycles: 2 },Opcode { name: "ROL", addr_t: Cpu::addr_ACC, operation: Cpu::op_ROL, cycles: 2 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 2 },Opcode { name: "BIT", addr_t: Cpu::addr_ABS, operation: Cpu::op_BIT, cycles: 4 },Opcode { name: "AND", addr_t: Cpu::addr_ABS, operation: Cpu::op_AND, cycles: 4 },Opcode { name: "ROL", addr_t: Cpu::addr_ABS, operation: Cpu::op_ROL, cycles: 6 },Opcode { name: "NUL", addr_t: Cpu::addr_ACC, operation: Cpu::op_NOP, cycles: 6 },
@@ -36,7 +36,7 @@ const OPCODE_LOOKUP: [Opcode; 256] = [
 ];
 
 pub struct Cpu {
-    pub bus: bus::Bus,
+    pub bus: Bus,
     pub pc: u16,
     pub cycles: u8,
     pub reg_a: u8,
@@ -49,11 +49,11 @@ pub struct Cpu {
     pub fetched: u8,
     pub abs_addr: u16,
     pub relative_addr_offset: i8,
-    pub is_accumulator_opcode : bool
+    pub is_accumulator_opcode : bool,
 }
 
 impl Cpu {
-    pub fn new(bus: bus::Bus) -> Self {
+    pub fn new(bus: Bus) -> Self {
         let flag = flag::Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
 
         Self {
@@ -104,6 +104,7 @@ impl Cpu {
             let current_opcode :u8 = self.bus.read_ram(self.pc);
             self.pc += 1;
 
+
             let opcode : &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
             self.is_accumulator_opcode = (opcode.addr_t as usize == Cpu::addr_ACC as usize);
 
@@ -140,7 +141,7 @@ impl Cpu {
         }
     }
 
-    fn nmi(& mut self) -> u8 {
+    pub fn nmi(& mut self) -> u8 {
         self.flag.set_flag_i(true);
         self.flag.set_flag_b(false);
 
@@ -151,7 +152,7 @@ impl Cpu {
         return 8;
     }
 
-    fn irq(& mut self) -> u8 {
+    pub fn irq(& mut self) -> u8 {
 
         if self.flag.get_flag_i(){
             return 0;
@@ -169,7 +170,7 @@ impl Cpu {
         return 7;
     }
 
-    fn reset(& mut self) -> u8 {
+    pub fn reset(& mut self) -> u8 {
         self.pc = self.bus.read_ram(0xFFFC) as u16 |  (self.bus.read_ram(0xFFFD) as u16) << 8;
 
         self.reg_a = 0;
