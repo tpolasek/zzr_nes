@@ -13,15 +13,22 @@ impl Flag {
     }
 
     pub fn set_sr(&mut self, value : u8){
-        self.flag_c = value & (1 << 0);
-        self.flag_z = value & (1 << 1);
-        self.flag_i = value & (1 << 2);
-        self.flag_d = value & (1 << 3);
-        self.flag_b = value & (1 << 4);
+        self.flag_c = self.u8_to_bool(value & (1 << 0));
+        self.flag_z = self.u8_to_bool(value & (1 << 1));
+        self.flag_i = self.u8_to_bool(value & (1 << 2));
+        self.flag_d = self.u8_to_bool(value & (1 << 3));
+        self.flag_b = self.u8_to_bool(value & (1 << 4));
         // 5 is empty
-        self.flag_v = value & (1 << 6);
-        self.flag_n = value & (1 << 7);
+        self.flag_v = self.u8_to_bool(value & (1 << 6));
+        self.flag_n = self.u8_to_bool(value & (1 << 7));
 
+    }
+
+    pub fn u8_to_bool(&self, set : u8) -> u8 {
+        return match set {
+            0 => 0,
+            _ => 1
+        };
     }
 
     pub fn bool_to_u8(&self, set : bool) -> u8 {

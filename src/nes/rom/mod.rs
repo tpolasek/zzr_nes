@@ -1,16 +1,16 @@
 pub struct Rom {
     //TODO add all possible PRG roms here
-    pub prg1: [u8; 0x4000] //16KB
+    pub prg1: [u8; 0x10000] //16KB
 }
 
 impl Rom {
     fn clear(&mut self){
-        for address in 0..0x4000 {
+        for address in 0..0x10000 {
             self.prg1[address as usize] = 0;
         }
     }
 
-    pub fn load_hex_dump(&mut self, program: &str) {
+    pub fn load_hex_dump(&mut self, offset : u16, program: &str) {
         self.clear();
 
         let lines = program.split("\n");
@@ -45,7 +45,7 @@ impl Rom {
 
         let hex_bytes = hex::decode(hexchars).expect("Decoding failed");
 
-        let mut address: u16 = 0;
+        let mut address: u16 = offset;
         for hex in hex_bytes {
             self.prg1[address as usize] = hex;
             address += 1;

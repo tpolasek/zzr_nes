@@ -83,6 +83,7 @@ impl Cpu {
     }
 
     fn fetch(&mut self){
+
         if !self.is_accumulator_opcode {
             self.fetched = self.bus.read_ram(self.abs_addr);
         }
@@ -719,7 +720,6 @@ impl Cpu {
     fn op_CMP(& mut self) -> u8 {
         self.fetch();
 
-
         let mut result : u8 = 0;
         if self.reg_a < self.fetched{
             result = 0xFF - (self.fetched - self.reg_a);
@@ -836,7 +836,7 @@ impl Opcode <'_>{
             return format!("{:04x}: {} ${:02x},Y", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_ABS as usize {
-            return format!("{:04x}: {} ${:04x}", pc_value, self.name, addr_u8);
+            return format!("{:04x}: {} ${:04x}", pc_value, self.name, addr_u16);
         }
         else if self.addr_t as usize == Cpu::addr_ABX as usize {
             return format!("{:04x}: {} ${:04x},X", pc_value, self.name, addr_u16);
