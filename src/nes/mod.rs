@@ -66,7 +66,10 @@ impl Nes {
     }
 
     pub fn read_nes_rom_test(&mut self){
-        self.cpu.bus.rom.load_rom(&String::from("/home/thomas/Downloads/donkey.nes"));
+
+        self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/zelda.nes"));
+        self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/donkey.nes"));
+        self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/radracer2.nes"));
     }
 
     pub fn run_test_suite_a(&mut self){
@@ -95,7 +98,6 @@ impl Nes {
         }
 
         self.cpu.bus.print_ram(0x0200, 0xff);
-
     }
 
     pub fn run_snake(&mut self){
