@@ -65,6 +65,10 @@ impl Nes {
         return (String::from(command), num);
     }
 
+    pub fn read_nes_rom_test(&mut self){
+        self.cpu.bus.rom.load_rom(&String::from("/home/thomas/Downloads/donkey.nes"));
+    }
+
     pub fn run_test_suite_a(&mut self){
         //self.debugger_mode();
 

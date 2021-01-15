@@ -17,14 +17,14 @@ impl Bus {
         Self {
            ram2k : Ram2k { memory: [0; 0x10000] }, // todo make this actually 2k
            controller: Controller::new(),
-           rom: Rom { prg1: [0; 0x10000] },
+           rom: Rom::new(),
            ppu: Ppu {}
         }
     }
 
     pub fn read_ram(&self, location : u16) -> u8 {
         return match location {
-            _ => self.rom.prg1[location as usize]
+            _ => self.rom.prg[location as usize]
         };
 
 
@@ -32,7 +32,7 @@ impl Bus {
 
     pub fn write_ram(&mut self, location : u16, value : u8){
         match location {
-            _ =>  self.rom.prg1[location as usize] = value
+            _ =>  self.rom.prg[location as usize] = value
         }
     }
 
