@@ -45,7 +45,7 @@ impl Bus {
     pub fn print_ram(&self, start : u16, length : u16){
         println!("\nMemory: start=0x{:04x} length=0x{:04x}", start, length);
         let mut counter: u32 = 0;
-        for addr in start..start+length+1 {
+        for addr in start..=(start+length) {
             if counter % 16 == 0 {
                 print!("{:04x}: ", addr);
             }
@@ -57,6 +57,7 @@ impl Bus {
 
             counter+=1;
         }
+        println!();
     }
 
 

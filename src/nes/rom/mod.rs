@@ -1,3 +1,7 @@
+use std::fs;
+use std::fs::File;
+use std::io::Read;
+
 pub struct Rom {
     //TODO add all possible PRG roms here
     pub prg1: [u8; 0x10000] //16KB
@@ -7,6 +11,18 @@ impl Rom {
     fn clear(&mut self){
         for address in 0..0x10000 {
             self.prg1[address as usize] = 0;
+        }
+    }
+
+    pub fn load_bin_file(&mut self,filename: &String) {
+        self.clear();
+
+        let mut f = File::open(&filename).expect("no file found");
+        let metadata = fs::metadata(&filename).expect("unable to read metadata");
+        let mut buffer = vec![0; metadata.len() as usize];
+        f.read(&mut buffer).expect("buffer overflow");
+        for address in 0..0x10000 {
+            self.prg1[address as usize] = buffer[address as usize];
         }
     }
 
