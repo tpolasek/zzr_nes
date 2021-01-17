@@ -9,7 +9,6 @@ pub enum Button {
     START
 }
 
-#[derive(Debug)]
 pub struct Controller {
     up: u8,
     down: u8,
@@ -20,7 +19,8 @@ pub struct Controller {
     select : u8,
     start : u8,
 
-    value : u8, // TODO remove this its specifically for snake
+    read_counter: u8,
+    strobe_high : bool
 }
 
 impl Controller {
@@ -34,7 +34,8 @@ impl Controller {
             b : 0,
             select : 0,
             start : 0,
-            value : 0
+            read_counter : 0,
+            strobe_high: true
         }
     }
     pub fn pressed(&mut self, button: Button){
@@ -60,35 +61,33 @@ impl Controller {
             Button::SELECT => self.select = value,
             Button::START => self.start = value
         }
-        let new_value = self.generate_value();
-        if new_value != 0 {
-            self.value = new_value;
-        }
-    }
-    
-    pub fn read(&self) -> u8 {
-        return self.value;
     }
 
-    fn generate_value(&self) -> u8{
-        if self.up != 0 {
-            return 0x77;
+    pub fn read(& mut self) -> u8 {
+        let value : u8 = match self.read_counter {
+            0 => self.a,
+            1 => self.b,
+            2 => self.select,
+            3 => self.start,
+            4 => self.up,
+            5 => self.down,
+            6 => self.left,
+            7 => self.right,
+            _ => 1 // default is 1 after we read all buttons
+        };
+
+        // only increment the read counter when strobe = low
+        if !self.strobe_high && self.read_counter < 8 {
+            self.read_counter += 1;
         }
 
-        if self.left != 0 {
-            return 0x61;
-        }
-
-        if self.down != 0 {
-            return 0x73;
-        }
-
-        if self.right != 0 {
-            return 0x64;
-        }
-
-        return 0x00;
+        return 0x40 | value;
     }
 
-
+    pub fn write(&mut self, value:u8){
+        self.strobe_high = (value & 0x01 != 0);
+        if self.strobe_high {
+            self.read_counter = 0;
+        }
+    }
 }
