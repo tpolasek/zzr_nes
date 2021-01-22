@@ -21,7 +21,7 @@ impl Bus {
            workram  : WorkRam { memory: [0; 0x2000]},
            controller: Controller::new(),
            rom: Rom::new(),
-           ppu: Ppu {}
+           ppu: Ppu::new()
         }
     }
 
@@ -34,10 +34,7 @@ impl Bus {
             0x0000..=0x1FFF => {
                 return self.ram2k.memory[(location & 0x7FF) as usize];
             },
-            0x2000..=0x3FFF => {
-                return self.ppu.read((location & 0x7) as u8);
-            },
-            0x4000..=0x5FFF => {
+            0x2000..=0x5FFF => {
                 return 0;
             },
             0x6000..=0x7FFF => {
@@ -60,7 +57,7 @@ impl Bus {
                 return self.ram2k.memory[(location & 0x7FF) as usize];
             },
             0x2000..=0x3FFF => {
-                return self.ppu.read((location & 0x7) as u8);
+                return self.ppu.cpuRead(&self.rom, (location & 0x7) as u8);
             },
             0x4000..=0x4013 => {
                 // APU
@@ -105,7 +102,7 @@ impl Bus {
                 self.ram2k.memory[(location & 0x7FF) as usize] = value;
             },
             0x2000..=0x3FFF => {
-                self.ppu.write((location & 0x7) as u8, value);
+                self.ppu.cpuWrite(&mut self.rom, (location & 0x7) as u8, value);
             },
             0x4000..=0x4013 => {
                 // APU
@@ -132,6 +129,7 @@ impl Bus {
             0x6000..=0x7FFF => {
                 self.workram.memory[(location & 0x1FFF) as usize] = value;
             },
+            // TODO extract into a mapper
             0x8000..=0xFFFF => {
                 if self.rom.prg_bank_count > 1 {
                     self.rom.prg[(location & 0x7FFF) as usize] = value; //32kb mask
