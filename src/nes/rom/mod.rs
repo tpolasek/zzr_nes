@@ -23,8 +23,8 @@ pub enum Mirroring {
 pub struct Rom {
     pub header : [u8; 16],
     pub trainer: [u8; 512],
-    pub prg: [u8; MAX_PRG_BANK_SIZE as usize],
-    pub chr: [u8; MAX_CHR_BANK_SIZE as usize],
+    prg: [u8; MAX_PRG_BANK_SIZE as usize],
+    chr: [u8; MAX_CHR_BANK_SIZE as usize],
     pub title: [u8; 128],
     pub title_size: u8,
 
@@ -53,6 +53,30 @@ impl Rom {
             mirroring: Mirroring::VERTICAL
         }
     }
+
+    // todo implement mapper (for READ/WRITE PRG CHR)
+    pub fn read_chr(&self, address : u16) -> u8{
+        return self.chr[(address & ((CHR_BANK_BANK_SIZE as u16)-1)) as usize];
+    }
+
+    pub fn read_prg(&self, address : u16) -> u8{
+        if self.prg_bank_count > 1 {
+            return self.prg[(address & 0x7FFF) as usize]; //32kb mask
+        }
+        else {
+            return self.prg[(address & 0x3FFF) as usize]; //16kb mask
+        }
+    }
+
+    pub fn write_prg(&mut self, address : u16, value :u8){
+        if self.prg_bank_count > 1 {
+            self.prg[(address & 0x7FFF) as usize] = value;//32kb mask
+        }
+        else {
+            self.prg[(address & 0x3FFF) as usize] = value; //16kb mask
+        }
+    }
+
 
     pub fn load_rom(&mut self,filename: &String) {
         let mut file_handle = File::open(&filename).expect("no file found");

@@ -34,17 +34,17 @@ impl Bus {
             0x0000..=0x1FFF => {
                 return self.ram2k.memory[(location & 0x7FF) as usize];
             },
-            0x2000..=0x5FFF => {
+            0x2000..=0x3FFF => {
+                return self.ppu.cpuReadImmutable(&self.rom, (location & 0x7) as u8);
+            },
+            0x4000..=0x5FFF => {
                 return 0;
             },
             0x6000..=0x7FFF => {
                 return self.workram.memory[(location & 0x1FFF) as usize];
             },
             0x8000..=0xFFFF => {
-                if self.rom.prg_bank_count > 1 {
-                    return self.rom.prg[(location & 0x7FFF) as usize]; //32kb mask
-                }
-                return self.rom.prg[(location & 0x3FFF) as usize]; //16kb mask
+                return self.rom.read_prg(location);
             }
         }
         return 0;
@@ -86,10 +86,7 @@ impl Bus {
                 return self.workram.memory[(location & 0x1FFF) as usize];
             },
             0x8000..=0xFFFF => {
-                if self.rom.prg_bank_count > 1 {
-                    return self.rom.prg[(location & 0x7FFF) as usize]; //32kb mask
-                }
-                return self.rom.prg[(location & 0x3FFF) as usize]; //16kb mask
+                return self.rom.read_prg(location);
             }
         }
         return 0;
@@ -131,10 +128,7 @@ impl Bus {
             },
             // TODO extract into a mapper
             0x8000..=0xFFFF => {
-                if self.rom.prg_bank_count > 1 {
-                    self.rom.prg[(location & 0x7FFF) as usize] = value; //32kb mask
-                }
-                self.rom.prg[(location & 0x3FFF) as usize] = value; //16kb mask
+                self.rom.write_prg(location, value);
             }
         }
     }
