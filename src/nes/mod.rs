@@ -34,7 +34,6 @@ impl Nes {
 
     fn reset_state(& mut self){
         self.cpu.bus.reset_ram();
-        self.cpu.reset();
     }
 
     fn debugger_mode(& mut self){
@@ -65,11 +64,33 @@ impl Nes {
         return (String::from(command), num);
     }
 
-    pub fn read_nes_rom_test(&mut self){
-
-        self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/zelda.nes"));
+    pub fn run_donkey(&mut self){
         self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/donkey.nes"));
-        self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/radracer2.nes"));
+        self.cpu.reset();
+
+        loop {
+            self.cpu.tick(true);
+            self.cpu.bus.ppu.tick();
+            self.cpu.bus.ppu.tick();
+            self.cpu.bus.ppu.tick();
+
+
+            if self.cpu.bus.ppu.scanline == 241 {
+                break;
+            }
+            //thread::sleep(ten_millis);
+        }
+
+        println!("Total ticks: {}", self.cpu.tick_count);
+        {
+            for x in 0..30 {
+                self.cpu.tick(true);
+                self.cpu.bus.ppu.tick();
+                self.cpu.bus.ppu.tick();
+                self.cpu.bus.ppu.tick();
+            }
+        }
+
     }
 
     pub fn run_test_suite_a(&mut self){

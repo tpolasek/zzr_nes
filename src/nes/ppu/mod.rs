@@ -7,8 +7,10 @@ static PALETTE_LOOKUP: [u32; 64] = [
     0xECEEEC, 0xA8CCEC, 0xBCBCEC, 0xD4B2EC, 0xECAEEC, 0xECAED4, 0xECB4B0, 0xE4C490, 0xCCD278, 0xB4DE78, 0xA8E290, 0x98E2B4, 0xA0D6E4, 0xA0A2A0, 0x000000, 0x000000
 ];
 
+const VBLANK_BIT :u8 = (1 << 7);
 
-pub struct Ppu {
+
+pub struct Ppu { // TODO once we are done debugging remove any public methods
     reg_ctrl : u8,
     reg_mask : u8,
     reg_status : u8,
@@ -16,7 +18,8 @@ pub struct Ppu {
     address : u16,
     data : u8,
     data_buffer: u8,
-    vertical_blank : bool,
+    pub pixel: u16,
+    pub scanline: u16,
 
     // https://wiki.nesdev.com/w/index.php/PPU_memory_map
     // pattern table usually maps to rom CHR
@@ -36,7 +39,8 @@ impl Ppu {
             address: 0,
             data : 0,
             data_buffer : 0,
-            vertical_blank: false,
+            pixel: 0,
+            scanline: 0,
             vram_bank_1: [0; 0x400],
             vram_bank_2: [0; 0x400],
             palette_ram: [0; 0x20]
@@ -128,11 +132,8 @@ impl Ppu {
 
                 // Palette mirroring
                 tmp_addr = match address {
-                    0x0010 => {0x0},
-                    0x0014 => {0x4},
-                    0x0018 => {0x8},
-                    0x001C => {0xC},
-                    _ => {0}
+                    0x10 | 0x14 | 0x18 | 0x1C => tmp_addr & 0xF,
+                    _ => tmp_addr
                 };
 
                 if self.reg_mask & 0x1 != 0 {
@@ -171,10 +172,13 @@ impl Ppu {
 
 
     fn read_PPUSTATUS(&mut self) -> u8{
-        // Wack behaviour on a NES, data_buffer gets here somehow
-        self.vertical_blank = false;
         self.address_latch = false;
-        return (self.reg_status & 0xE0) | (self.data_buffer & 0x1F);
+
+        // last 5 bits are the last data bits written -- whack
+        let output = (self.reg_status & 0xE0) | (self.data_buffer & 0x1F);
+
+        self.reg_status &= !VBLANK_BIT;
+        return output;
     }
 
     fn read_PPUSTATUS_Immutable(&self) -> u8{
@@ -217,6 +221,7 @@ impl Ppu {
 
     fn write_PPUCTRL(&mut self, value : u8){
         self.reg_ctrl = value;
+        self.data_buffer = value;
     }
     fn write_PPUMASK(&mut self, value : u8){
         self.reg_mask = value;
@@ -249,6 +254,7 @@ impl Ppu {
         else {
             self.address += 1;
         }
+        self.data_buffer = value; // sets LSB 5 bits in the STATUS Register
     }
 
     fn write_PPUDATA(&mut self, value : u8){
@@ -259,5 +265,26 @@ impl Ppu {
     fn get_color(& self,rom: &Rom, palette: u8, sprite_color_index: u8) -> u32{
         // 4 colors per palette, sprite_color_index indexes into the palette
         return PALETTE_LOOKUP[(self.ppuRead(rom,0x3F00 + ((palette as u16) << 2) + (sprite_color_index as u16)) & 0x3F) as usize];
+    }
+
+    pub fn tick(&mut self){
+        self.pixel +=1;
+
+        if self.pixel > 340 {
+            self.pixel = 0;
+            self.scanline += 1;
+            if self.scanline > 261 {
+                self.scanline = 0;
+            }
+        }
+
+        if self.scanline == 1 {
+            self.reg_status &= !VBLANK_BIT;
+        }
+
+        if self.scanline == 241 {
+            self.reg_status |= VBLANK_BIT;
+        }
+
     }
 }

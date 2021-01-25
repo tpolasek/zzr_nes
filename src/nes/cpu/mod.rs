@@ -171,7 +171,7 @@ impl Cpu {
         return 7;
     }
 
-    pub fn reset(& mut self) -> u8 {
+    pub fn reset(& mut self) {
         self.pc = self.bus.read_ram(0xFFFC) as u16 |  (self.bus.read_ram(0xFFFD) as u16) << 8;
 
         self.reg_a = 0;
@@ -184,7 +184,7 @@ impl Cpu {
         self.relative_addr_offset = 0x00;
         self.fetched = 0x00;
 
-        return 8;
+        self.cycles = 7;
     }
 
 
