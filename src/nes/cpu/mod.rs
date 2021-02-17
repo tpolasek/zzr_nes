@@ -89,7 +89,7 @@ impl Cpu {
         }
     }
 
-    pub fn tick(&mut self, print: bool) {
+    pub fn tick(&mut self) {
         self.tick_count += 1;
 
         if self.cycles > 0 {
@@ -105,37 +105,33 @@ impl Cpu {
             let current_opcode :u8 = self.bus.read_ram(self.pc);
             self.pc += 1;
 
-
             let opcode : &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
             self.is_accumulator_opcode = (opcode.addr_t as usize == Cpu::addr_ACC as usize);
-
-            //println!("Optcode byte: {:02x}", value);
-            if print {
-                self.print_cpu_state(opcode);
-            }
 
             self.cycles += (opcode.addr_t as fn(cpu : & mut Cpu) -> u8) (self);
             self.cycles += (opcode.operation as fn(cpu : & mut Cpu) -> u8) (self);
             self.cycles += opcode.cycles;
             self.cycles -= 1;
-
         }
     }
 
-    fn print_cpu_state(&self, opcode :  &Opcode) {
-        println!("{:20} A={:02x} X={:02x} Y={:02x} SP={:02x} PC={:04x} {}",
-                 opcode.get_instruction_decoded(self, self.pc - 1),
-                 self.reg_a, self.reg_x, self.reg_y, self.reg_sp, self.pc,
-                 self.flag.get_formatted_str());
+    pub fn get_cpu_state_at_pc(&mut self, addr : u16) -> (String, u16) {
+        let current_opcode :u8 = self.bus.read_ram(addr);
+        let opcode : &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
+
+        return (format!("{:20} A={:02x} X={:02x} Y={:02x} SP={:02x} PC={:04x} {}",
+                 opcode.get_instruction_decoded(self, addr),
+                 self.reg_a, self.reg_x, self.reg_y, self.reg_sp, addr,
+                 self.flag.get_formatted_str()), opcode.get_opcode_byte_size());
     }
 
     fn get_reg_sr(&self) -> u8 {
         return self.flag.get_sr();
     }
 
-    pub fn run_until_interrupt(&mut self, print : bool){
+    pub fn run_until_interrupt(&mut self){
         loop {
-            self.tick(print);
+            self.tick();
             if self.pc == 0x00 {
                 break;
             }

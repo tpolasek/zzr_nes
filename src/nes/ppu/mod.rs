@@ -20,13 +20,14 @@ pub struct Ppu { // TODO once we are done debugging remove any public methods
     data_buffer: u8,
     pub pixel: u16,
     pub scanline: u16,
+    pub gbuffer: Vec<u32>,
 
     // https://wiki.nesdev.com/w/index.php/PPU_memory_map
     // pattern table usually maps to rom CHR
     vram_bank_1: [u8; 0x400], //  Nametable Ram only 2k (room for 2 nametables mirrored, some roms have onboard memory for 4 tables)
     vram_bank_2: [u8; 0x400],
-    palette_ram: [u8; 0x20],
-    //TODO OAM memory 256 bytes (64-4 byte groups)
+    palette_ram: [u8; 0x20]
+//TODO OAM memory 256 bytes (64-4 byte groups)
 }
 
 impl Ppu {
@@ -41,10 +42,15 @@ impl Ppu {
             data_buffer : 0,
             pixel: 0,
             scanline: 0,
+            gbuffer: vec![0; 256*240],
             vram_bank_1: [0; 0x400],
             vram_bank_2: [0; 0x400],
-            palette_ram: [0; 0x20]
+            palette_ram: [0; 0x20],
         }
+    }
+
+    pub fn is_vblank(&self) -> bool{
+        return self.reg_status & VBLANK_BIT != 0;
     }
 
     pub fn cpuReadImmutable(&self, rom: &Rom, register_num : u8) -> u8{
@@ -270,6 +276,11 @@ impl Ppu {
     pub fn tick(&mut self){
         self.pixel +=1;
 
+
+        if self.pixel >= 0 && self.pixel < 256 && self.scanline >= 0 && self.scanline < 240{
+            self.gbuffer[(self.pixel + self.scanline*256) as usize] = 0xFF0000; // TODO get actual pixel to draw
+        }
+
         if self.pixel > 340 {
             self.pixel = 0;
             self.scanline += 1;
@@ -278,12 +289,13 @@ impl Ppu {
             }
         }
 
-        if self.scanline == 1 {
+        if self.scanline == 261 && self.pixel == 1 {
             self.reg_status &= !VBLANK_BIT;
         }
 
-        if self.scanline == 241 {
+        if self.scanline == 241 && self.pixel == 1 {
             self.reg_status |= VBLANK_BIT;
+
         }
 
     }

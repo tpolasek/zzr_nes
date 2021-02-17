@@ -2,6 +2,7 @@ use std::time::Instant;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
 use std::{thread, time};
 use std::io;
+use console::style;
 
 mod bus;
 mod cpu;
@@ -65,32 +66,120 @@ impl Nes {
     }
 
     pub fn run_donkey(&mut self){
+
+        use console::Term;
+        let term = Term::stdout();
+
         self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/donkey.nes"));
         self.cpu.reset();
 
-        loop {
-            self.cpu.tick(true);
-            self.cpu.bus.ppu.tick();
-            self.cpu.bus.ppu.tick();
-            self.cpu.bus.ppu.tick();
+        let mut gwindow = Window::new(
+            "Game Window",
+            256,
+            240,
+            WindowOptions {
+                resize: false,
+                scale_mode: ScaleMode::UpperLeft,
+                ..WindowOptions::default()
+            },
+        ).expect("Unable to create window");
+        gwindow.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
+        let mut button_f6_pressed : bool = false;
+        let mut button_f7_pressed : bool = false;
+        let mut step_mode : bool = true;
+        let mut step_next_count : u16 = 0;
 
-            if self.cpu.bus.ppu.scanline == 241 {
-                break;
+        while gwindow.is_open() && !gwindow.is_key_down(Key::Escape) {
+
+            if step_mode {
+                while step_next_count > 0 {
+                    self.cpu.tick();
+                    self.cpu.bus.ppu.tick();
+                    self.cpu.bus.ppu.tick();
+                    self.cpu.bus.ppu.tick();
+                    step_next_count -= 1;
+
+                    if step_next_count == 0 {
+                        let mut offset = self.cpu.pc;
+                        for i in 0..16 {
+                            let (instruction_str, instruction_size) = self.cpu.get_cpu_state_at_pc(offset);
+                            if i == 0 {
+                                term.write_line(&format!("{}", style(instruction_str).red()));
+                            } else {
+                                term.write_line(&format!("{}", style(instruction_str).cyan()));
+                            }
+                            offset += instruction_size;
+                        }
+                        term.move_cursor_up(16);
+                    }
+
+                    while self.cpu.cycles != 0 {
+                        self.cpu.tick();
+                        self.cpu.bus.ppu.tick();
+                        self.cpu.bus.ppu.tick();
+                        self.cpu.bus.ppu.tick();
+                    }
+                }
             }
-            //thread::sleep(ten_millis);
-        }
+            else {
+                // loop mode until vblank exit
 
-        println!("Total ticks: {}", self.cpu.tick_count);
-        {
-            for x in 0..30 {
-                self.cpu.tick(true);
-                self.cpu.bus.ppu.tick();
-                self.cpu.bus.ppu.tick();
-                self.cpu.bus.ppu.tick();
+                let mut hit_vblank = false;
+                loop {
+                    self.cpu.tick();
+                    self.cpu.bus.ppu.tick();
+                    self.cpu.bus.ppu.tick();
+                    self.cpu.bus.ppu.tick();
+
+                    if self.cpu.bus.ppu.is_vblank() {
+                        hit_vblank = true;
+                    } else if hit_vblank {
+                        // Just exited the vblank
+                        break;
+                    }
+                }
             }
-        }
 
+            gwindow.get_keys().map(|keys| {
+                for t in keys {
+                    match t {
+                        Key::W => self.cpu.bus.controller.pressed(Button::UP),
+                        Key::A => self.cpu.bus.controller.pressed(Button::LEFT),
+                        Key::S => self.cpu.bus.controller.pressed(Button::DOWN),
+                        Key::D => self.cpu.bus.controller.pressed(Button::RIGHT),
+                        Key::K => self.cpu.bus.controller.pressed(Button::A),
+                        Key::L => self.cpu.bus.controller.pressed(Button::B),
+                        Key::F6 => {if !button_f6_pressed {step_mode = true; step_next_count = 100; button_f6_pressed = true;}},
+                        Key::F7 => {if !button_f7_pressed {step_mode = true; step_next_count = 1; button_f7_pressed = true;}},
+                        Key::F8 => {step_mode = false},
+                        Key::RightShift => self.cpu.bus.controller.pressed(Button::SELECT),
+                        Key::Enter => self.cpu.bus.controller.pressed(Button::START),
+                        _ => (),
+                    }
+                }
+            });
+
+            gwindow.get_keys_released().map(|keys| {
+                for t in keys {
+                    match t {
+                        Key::W => self.cpu.bus.controller.released(Button::UP),
+                        Key::A => self.cpu.bus.controller.released(Button::LEFT),
+                        Key::S => self.cpu.bus.controller.released(Button::DOWN),
+                        Key::D => self.cpu.bus.controller.released(Button::RIGHT),
+                        Key::K => self.cpu.bus.controller.released(Button::A),
+                        Key::L => self.cpu.bus.controller.released(Button::B),
+                        Key::F6 => {button_f6_pressed = false;},
+                        Key::F7 => {button_f7_pressed = false;},
+                        Key::RightShift => self.cpu.bus.controller.released(Button::SELECT),
+                        Key::Enter => self.cpu.bus.controller.released(Button::START),
+                        _ => (),
+                    }
+                }
+            });
+
+            gwindow.update_with_buffer(&self.cpu.bus.ppu.gbuffer, 256, 240);
+        }
     }
 
     pub fn run_test_suite_a(&mut self){
@@ -109,12 +198,12 @@ impl Nes {
 
         for index in 0..100_000 {
             //thread::sleep(ten_millis);
-            self.cpu.tick(false);
+            self.cpu.tick();
         }
 
 
         for addr in 0..20 {
-            self.cpu.tick(true);
+            self.cpu.tick();
            //thread::sleep(ten_millis);
         }
 
@@ -171,7 +260,7 @@ impl Nes {
                 if self.cpu.pc == 0x00 {
                     break;
                 }
-                self.cpu.tick(false);
+                self.cpu.tick();
             }
 
             let mut index : u32 = 0;
@@ -227,7 +316,7 @@ impl Nes {
         self.reset_state();
         self.cpu.pc = 0x0600;
         self.cpu.bus.rom.load_hex_dump(0x0600,"0600: a2 00 a0 00 8a 99 00 02 48 e8 c8 c0 10 d0 f5 68 99 00 02 c8 c0 20 d0 f7" );
-        self.cpu.run_until_interrupt(false);
+        self.cpu.run_until_interrupt();
 
         for i in 0..=0xf{
             assert!(self.cpu.bus.read_ram(0x200 + i) == i as u8);
@@ -244,7 +333,7 @@ impl Nes {
         self.cpu.bus.rom.load_hex_dump(0x0600, "0600: a2 00 a0 00 a9 00 e8 c8 69 01 18 90 f9" );
         let start = Instant::now();
         for addr in 0..loop_count {
-            self.cpu.tick(false);
+            self.cpu.tick();
         }
 
         let elapsed = start.elapsed();
@@ -266,8 +355,8 @@ impl Nes {
         self.cpu.pc = 0x0600;
         self.cpu.bus.rom.load_hex_dump(0x0600, "0600: a9 02 8d 01 02 aa 7d ff 01 aa 7d ff 01 a9 00 " );
 
-        self.cpu.tick(false);
-        self.cpu.tick(false);
+        self.cpu.tick();
+        self.cpu.tick();
         assert!(!self.cpu.flag.get_flag_z());
         assert!(!self.cpu.flag.get_flag_n());
         assert!(self.cpu.reg_a == 2);
@@ -275,41 +364,41 @@ impl Nes {
         assert!(self.cpu.bus.read_ram(0x0201) == 0);
 
         // STA $0201
-        self.cpu.tick(false);
-        self.cpu.tick(false);
-        self.cpu.tick(false);
+        self.cpu.tick();
+        self.cpu.tick();
+        self.cpu.tick();
         assert!(self.cpu.bus.read_ram(0x0201) == 2);
         assert!(self.cpu.reg_x == 0);
 
         //TAX
-        self.cpu.tick(false);
-        self.cpu.tick(false);
+        self.cpu.tick();
+        self.cpu.tick();
         assert!(self.cpu.reg_x == 2);
 
         // ADC $01FF,X  --- 5 cycles because page jump
-        self.cpu.tick(false);
-        self.cpu.tick(false);
-        self.cpu.tick(false);
-        self.cpu.tick(false);
-        self.cpu.tick(false);
+        self.cpu.tick();
+        self.cpu.tick();
+        self.cpu.tick();
+        self.cpu.tick();
+        self.cpu.tick();
         assert!(self.cpu.reg_a == 4);
 
         //TAX
-        self.cpu.tick(false);
-        self.cpu.tick(false);
+        self.cpu.tick();
+        self.cpu.tick();
         assert!(self.cpu.reg_x == 4);
 
         // ADC $01FF,X  --- 4 cycles no page jump
-        self.cpu.tick(false);
-        self.cpu.tick(false);
-        self.cpu.tick(false);
-        self.cpu.tick(false);
-        self.cpu.tick(false);
+        self.cpu.tick();
+        self.cpu.tick();
+        self.cpu.tick();
+        self.cpu.tick();
+        self.cpu.tick();
         assert!(self.cpu.reg_a == 4);
 
         //    LDA #$00
-        self.cpu.tick(false);
-        self.cpu.tick(false);
+        self.cpu.tick();
+        self.cpu.tick();
         assert!(self.cpu.reg_a == 0);
     }
 }
