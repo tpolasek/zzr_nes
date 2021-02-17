@@ -4,6 +4,7 @@ use std::{thread, time};
 use std::io;
 use console::style;
 
+
 mod bus;
 mod cpu;
 mod ram2k;
@@ -68,10 +69,27 @@ impl Nes {
     pub fn run_donkey(&mut self){
 
         use console::Term;
-        let term = Term::stdout();
+        let term_writer = Term::stdout();
+        let term_reader = Term::stdout();
+        let mut term_read_buffer: String = String::new();
+
+        let mut button_f6_pressed : bool = false;
+        let mut button_f7_pressed : bool = false;
+        let mut button_f8_pressed : bool = false;
+        let mut button_f9_pressed : bool = false;
+
+        let mut query_break_point : bool = false;
+        let mut break_point_addr : u16 = 0;
+
+        let mut step_mode : bool = true;
+        let mut step_next_count : u16 = 0;
 
         self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/donkey.nes"));
         self.cpu.reset();
+
+        term_writer.write_line("--------------------------------------------------------");
+        term_writer.write_line("--------------------------------------------------------");
+        term_writer.write_line("--------------------------------------------------------");
 
         let mut gwindow = Window::new(
             "Game Window",
@@ -85,12 +103,19 @@ impl Nes {
         ).expect("Unable to create window");
         gwindow.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
-        let mut button_f6_pressed : bool = false;
-        let mut button_f7_pressed : bool = false;
-        let mut step_mode : bool = true;
-        let mut step_next_count : u16 = 0;
-
         while gwindow.is_open() && !gwindow.is_key_down(Key::Escape) {
+            if query_break_point {
+                query_break_point = false;
+
+                term_writer.move_cursor_up(2);
+                term_writer.write_line("Set breakpoint address in hex format 0000: ");
+                term_read_buffer = term_reader.read_line().ok().unwrap();
+                term_writer.clear_last_lines(2);
+
+                break_point_addr = (u32::from_str_radix(&term_read_buffer, 16).unwrap() & 0xFFFF) as u16;
+                term_writer.write_line(&format!("Set breakpoint to: 0x{:04x}", break_point_addr));
+                term_writer.move_cursor_down(1);
+            }
 
             if step_mode {
                 while step_next_count > 0 {
@@ -100,20 +125,6 @@ impl Nes {
                     self.cpu.bus.ppu.tick();
                     step_next_count -= 1;
 
-                    if step_next_count == 0 {
-                        let mut offset = self.cpu.pc;
-                        for i in 0..16 {
-                            let (instruction_str, instruction_size) = self.cpu.get_cpu_state_at_pc(offset);
-                            if i == 0 {
-                                term.write_line(&format!("{}", style(instruction_str).red()));
-                            } else {
-                                term.write_line(&format!("{}", style(instruction_str).cyan()));
-                            }
-                            offset += instruction_size;
-                        }
-                        term.move_cursor_up(16);
-                    }
-
                     while self.cpu.cycles != 0 {
                         self.cpu.tick();
                         self.cpu.bus.ppu.tick();
@@ -121,12 +132,32 @@ impl Nes {
                         self.cpu.bus.ppu.tick();
                     }
                 }
+
+                let mut pc_addr_scan_ahead = self.cpu.pc;
+                for i in 0..16 {
+                    let (instruction_str, instruction_size) = self.cpu.get_cpu_state_at_pc(pc_addr_scan_ahead);
+                    if i == 0 {
+                        term_writer.write_line(&format!("{}", style(instruction_str).red()));
+                    } else {
+                        term_writer.write_line(&format!("{}", style(instruction_str).cyan()));
+                    }
+                    pc_addr_scan_ahead += instruction_size;
+                }
+                term_writer.move_cursor_up(16);
             }
             else {
-                // loop mode until vblank exit
-
-                let mut hit_vblank = false;
+                // Loop mode until Vblank exit
+                let mut hit_vblank = false;gi
                 loop {
+
+                    // Hit breakpoint
+                    if self.cpu.pc == break_point_addr {
+                        break_point_addr = 0;
+                        step_mode = true;
+                        step_next_count = 0;
+                        break;
+                    }
+
                     self.cpu.tick();
                     self.cpu.bus.ppu.tick();
                     self.cpu.bus.ppu.tick();
@@ -152,7 +183,8 @@ impl Nes {
                         Key::L => self.cpu.bus.controller.pressed(Button::B),
                         Key::F6 => {if !button_f6_pressed {step_mode = true; step_next_count = 100; button_f6_pressed = true;}},
                         Key::F7 => {if !button_f7_pressed {step_mode = true; step_next_count = 1; button_f7_pressed = true;}},
-                        Key::F8 => {step_mode = false},
+                        Key::F8 => {if !button_f8_pressed {step_mode = false; button_f8_pressed = true;}},
+                        Key::F9 => {if !button_f9_pressed {query_break_point = true; button_f9_pressed = true;}},
                         Key::RightShift => self.cpu.bus.controller.pressed(Button::SELECT),
                         Key::Enter => self.cpu.bus.controller.pressed(Button::START),
                         _ => (),
@@ -171,6 +203,8 @@ impl Nes {
                         Key::L => self.cpu.bus.controller.released(Button::B),
                         Key::F6 => {button_f6_pressed = false;},
                         Key::F7 => {button_f7_pressed = false;},
+                        Key::F8 => {button_f8_pressed = false;},
+                        Key::F9 => {button_f9_pressed = false;},
                         Key::RightShift => self.cpu.bus.controller.released(Button::SELECT),
                         Key::Enter => self.cpu.bus.controller.released(Button::START),
                         _ => (),
