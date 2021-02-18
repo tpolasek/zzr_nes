@@ -199,6 +199,7 @@ impl Rom {
         println!("Mapper number: {:?}", self.mapper_number);
     }
 
+    /*
     pub fn load_bin_file(&mut self,filename: &String) {
         let mut f = File::open(&filename).expect("no file found");
         let metadata = fs::metadata(&filename).expect("unable to read metadata");
@@ -216,7 +217,7 @@ impl Rom {
 
         for line in lines {
             let char_vec: Vec<char> = line.chars().collect();
-            let mut foundColon: bool = false;
+            let mut found_colon: bool = false;
             for c in char_vec {
                 if c == ' ' {
                     continue;
@@ -229,10 +230,10 @@ impl Rom {
                     break;
                 }
                 if c == ':' {
-                    foundColon = true;
+                    found_colon = true;
                     continue;
                 }
-                if !foundColon {
+                if !found_colon {
                     continue;
                 }
 
@@ -248,4 +249,5 @@ impl Rom {
             address += 1;
         }
     }
+    */
 }

@@ -89,6 +89,10 @@ impl Cpu {
         }
     }
 
+    pub fn ready_to_execute_next_instruction(&self) -> bool{
+        return self.cycles == 0;
+    }
+
     pub fn tick(&mut self) {
         self.tick_count += 1;
 

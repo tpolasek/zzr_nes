@@ -277,7 +277,7 @@ impl Ppu {
         self.pixel +=1;
 
 
-        if self.pixel >= 0 && self.pixel < 256 && self.scanline >= 0 && self.scanline < 240{
+        if self.pixel < 256 && self.scanline < 240{
             self.gbuffer[(self.pixel + self.scanline*256) as usize] = 0xFF0000; // TODO get actual pixel to draw
         }
 
