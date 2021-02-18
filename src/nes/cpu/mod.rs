@@ -115,15 +115,19 @@ impl Cpu {
         }
     }
 
-    pub fn get_cpu_state_at_pc(&mut self, addr : u16) -> (String, u16) {
+    pub fn get_cpu_opcode_str(&mut self, addr : u16) -> (String, u16) {
         let current_opcode :u8 = self.bus.read_ram(addr);
         let opcode : &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
 
-        return (format!("{:20} A={:02x} X={:02x} Y={:02x} SP={:02x} PC={:04x} {}",
-                 opcode.get_instruction_decoded(self, addr),
-                 self.reg_a, self.reg_x, self.reg_y, self.reg_sp, addr,
-                 self.flag.get_formatted_str()), opcode.get_opcode_byte_size());
+        return (format!("{:20}", opcode.get_instruction_decoded(self, addr)), opcode.get_opcode_byte_size());
     }
+
+    pub fn get_cpu_state_str(&self) -> String{
+        return format!("A={:02x} X={:02x} Y={:02x} SP={:02x} PC={:04x} {}",
+                        self.reg_a, self.reg_x, self.reg_y, self.reg_sp, self.pc,
+                        self.flag.get_formatted_str());
+    }
+
 
     fn get_reg_sr(&self) -> u8 {
         return self.flag.get_sr();

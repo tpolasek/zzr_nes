@@ -87,12 +87,13 @@ impl Nes {
         self.cpu.bus.rom.load_rom(&String::from("/home/thomas/code/rustynes/roms/donkey.nes"));
         self.cpu.reset();
 
+        term_writer.clear_screen();
         term_writer.write_line("--------------------------------------------------------");
         term_writer.write_line("--------------------------------------------------------");
         term_writer.write_line("--------------------------------------------------------");
 
         let mut gwindow = Window::new(
-            "Game Window",
+            "ZZR",
             256,
             240,
             WindowOptions {
@@ -102,7 +103,7 @@ impl Nes {
             },
         ).expect("Unable to create window");
         gwindow.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
-
+        gwindow.set_position(1920/2 - 256,1080/2 - 240);
         while gwindow.is_open() && !gwindow.is_key_down(Key::Escape) {
             if query_break_point {
                 query_break_point = false;
@@ -132,26 +133,29 @@ impl Nes {
                         self.cpu.bus.ppu.tick();
                     }
                 }
-
                 let mut pc_addr_scan_ahead = self.cpu.pc;
                 for i in 0..16 {
-                    let (instruction_str, instruction_size) = self.cpu.get_cpu_state_at_pc(pc_addr_scan_ahead);
+                    let (instruction_str, instruction_size) = self.cpu.get_cpu_opcode_str(pc_addr_scan_ahead);
                     if i == 0 {
-                        term_writer.write_line(&format!("{}", style(instruction_str).red()));
+                        term_writer.write_line(&format!("{} {}", style(instruction_str).red(), style(self.cpu.get_cpu_state_str()).white()));
                     } else {
                         term_writer.write_line(&format!("{}", style(instruction_str).cyan()));
                     }
                     pc_addr_scan_ahead += instruction_size;
                 }
-                term_writer.move_cursor_up(16);
+                term_writer.write_line(&format!("Tick Count: {}", style(self.cpu.tick_count).yellow()));
+                term_writer.move_cursor_up(16 + 1 );
             }
             else {
                 // Loop mode until Vblank exit
-                let mut hit_vblank = false;gi
+                let mut hit_vblank = false;
                 loop {
-
                     // Hit breakpoint
                     if self.cpu.pc == break_point_addr {
+                        term_writer.move_cursor_up(2);
+                        term_writer.clear_line();
+                        term_writer.write_line(&format!("{} {:04x}!",style("Hit Breakpoint at").green(), style(break_point_addr).green()));
+                        term_writer.move_cursor_down(1);
                         break_point_addr = 0;
                         step_mode = true;
                         step_next_count = 0;
@@ -181,7 +185,7 @@ impl Nes {
                         Key::D => self.cpu.bus.controller.pressed(Button::RIGHT),
                         Key::K => self.cpu.bus.controller.pressed(Button::A),
                         Key::L => self.cpu.bus.controller.pressed(Button::B),
-                        Key::F6 => {if !button_f6_pressed {step_mode = true; step_next_count = 100; button_f6_pressed = true;}},
+                        Key::F6 => {if !button_f6_pressed {step_mode = true; step_next_count = 400; button_f6_pressed = true;}},
                         Key::F7 => {if !button_f7_pressed {step_mode = true; step_next_count = 1; button_f7_pressed = true;}},
                         Key::F8 => {if !button_f8_pressed {step_mode = false; button_f8_pressed = true;}},
                         Key::F9 => {if !button_f9_pressed {query_break_point = true; button_f9_pressed = true;}},
