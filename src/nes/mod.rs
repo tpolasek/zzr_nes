@@ -33,8 +33,16 @@ impl Nes {
 
     #[inline(always)]
     fn execute_cpu_ppu(&mut self){
-        // TODO NMI handling should probably be done here
-        self.cpu.tick();
+        if self.cpu.bus.dma_cycles > 0 {
+            self.cpu.bus.dma_cycles -= 1;
+        }
+        else {
+            if self.cpu.bus.ppu.get_and_reset_nmi_triggered(){
+                self.cpu.trigger_nmi(); // applies nmi instantly, but adds the clock cost
+            }
+            self.cpu.tick();
+        }
+
         self.cpu.bus.ppu.tick();
         self.cpu.bus.ppu.tick();
         self.cpu.bus.ppu.tick();
@@ -88,10 +96,10 @@ impl Nes {
                 term_writer.clear_last_lines(2).ok();
 
                 break_point_addr = (u32::from_str_radix(&term_read_buffer, 16).unwrap() & 0xFFFF) as u16;
+
                 term_writer.write_line(&format!("Set breakpoint to: 0x{:04x}", break_point_addr)).ok();
                 term_writer.move_cursor_down(1).ok();
             }
-
             if step_mode {
                 while step_next_count > 0 {
                     self.execute_cpu_ppu();

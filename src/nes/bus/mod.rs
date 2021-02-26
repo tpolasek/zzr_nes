@@ -12,6 +12,8 @@ pub struct Bus {
     pub controller: Controller,
     pub rom: Rom,
     pub ppu: Ppu,
+    pub dma_cycles: u16,
+
 }
 
 impl Bus {
@@ -21,14 +23,15 @@ impl Bus {
            workram  : WorkRam { memory: [0; 0x2000]},
            controller: Controller::new(),
            rom: Rom::new(),
-           ppu: Ppu::new()
+           ppu: Ppu::new(),
+           dma_cycles: 0,
         }
     }
 
     /*
     This function does not have any side effects
     */
-    pub fn read_ram_opcode(&self, location : u16) -> u8 {
+    pub fn read_ram_opcode_decoding(&self, location : u16) -> u8 {
         // mapper 0
         match location {
             0x0000..=0x1FFF => {
@@ -93,6 +96,7 @@ impl Bus {
     }
 
     pub fn write_ram(&mut self, location : u16, value : u8){
+
         // Mapper 0
         match location {
             0x0000..=0x1FFF => {
@@ -105,7 +109,7 @@ impl Bus {
                 // APU
             },
             0x4014 => {
-                // OAMDMA
+                self.OAMDMA_write(value);
             },
             0x4015 => {
                 // SND_CHN
@@ -131,6 +135,17 @@ impl Bus {
                 self.rom.write_prg(location, value);
             }
         }
+    }
+
+    fn OAMDMA_write(&mut self, value : u8){
+        let cpu_start_address = (value as u16) << 8;
+
+        // We copy the data right away, normally this would happen on a per tick basis
+        for i in 0..=0xFF{
+            self.ppu.oam_ram[i] = self.read_ram(cpu_start_address + (i as u16));
+        }
+
+        self.dma_cycles = 513; // TODO should be 513, 514 depending on CPU tick
     }
 
     pub fn reset_ram(&mut self){

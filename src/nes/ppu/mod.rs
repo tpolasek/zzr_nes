@@ -7,8 +7,8 @@ static PALETTE_LOOKUP: [u32; 64] = [
     0xECEEEC, 0xA8CCEC, 0xBCBCEC, 0xD4B2EC, 0xECAEEC, 0xECAED4, 0xECB4B0, 0xE4C490, 0xCCD278, 0xB4DE78, 0xA8E290, 0x98E2B4, 0xA0D6E4, 0xA0A2A0, 0x000000, 0x000000
 ];
 
-const VBLANK_BIT :u8 = (1 << 7);
-
+const PPU_STATUS_VBLANK_BIT: u8 = (1 << 7);
+const PPU_CTRL_NMI_TRIGGER_BIT: u8 = (1 << 7);
 
 pub struct Ppu { // TODO once we are done debugging remove any public methods
     reg_ctrl : u8,
@@ -21,13 +21,14 @@ pub struct Ppu { // TODO once we are done debugging remove any public methods
     pub pixel: u16,
     pub scanline: u16,
     pub gbuffer: Vec<u32>,
+    nmi_triggered: bool,
 
     // https://wiki.nesdev.com/w/index.php/PPU_memory_map
     // pattern table usually maps to rom CHR
     vram_bank_1: [u8; 0x400], //  Nametable Ram only 2k (room for 2 nametables mirrored, some roms have onboard memory for 4 tables)
     vram_bank_2: [u8; 0x400],
-    palette_ram: [u8; 0x20]
-//TODO OAM memory 256 bytes (64-4 byte groups)
+    palette_ram: [u8; 0x20],
+    pub oam_ram: [u8; 0xFF]
 }
 
 impl Ppu {
@@ -43,14 +44,16 @@ impl Ppu {
             pixel: 0,
             scanline: 0,
             gbuffer: vec![0; 256*240],
+            nmi_triggered: false,
             vram_bank_1: [0; 0x400],
             vram_bank_2: [0; 0x400],
             palette_ram: [0; 0x20],
+            oam_ram: [0; 0xFF]
         }
     }
 
     pub fn is_vblank(&self) -> bool{
-        return self.reg_status & VBLANK_BIT != 0;
+        return self.reg_status & PPU_STATUS_VBLANK_BIT != 0;
     }
 
     pub fn cpuReadImmutable(&self, rom: &Rom, register_num : u8) -> u8{
@@ -183,7 +186,7 @@ impl Ppu {
         // last 5 bits are the last data bits written -- whack
         let output = (self.reg_status & 0xE0) | (self.data_buffer & 0x1F);
 
-        self.reg_status &= !VBLANK_BIT;
+        self.reg_status &= !PPU_STATUS_VBLANK_BIT;
         return output;
     }
 
@@ -290,13 +293,25 @@ impl Ppu {
         }
 
         if self.scanline == 261 && self.pixel == 1 {
-            self.reg_status &= !VBLANK_BIT;
+            self.reg_status &= !PPU_STATUS_VBLANK_BIT;
         }
 
+        // Set VLBANK
         if self.scanline == 241 && self.pixel == 1 {
-            self.reg_status |= VBLANK_BIT;
+            if self.reg_ctrl & PPU_CTRL_NMI_TRIGGER_BIT != 0{
+                self.nmi_triggered = true;
+            }
+            self.reg_status |= PPU_STATUS_VBLANK_BIT;
 
         }
-
     }
+
+    pub fn get_and_reset_nmi_triggered(&mut self) -> bool{
+        if self.nmi_triggered {
+            self.nmi_triggered = false;
+            return true;
+        }
+        return false;
+    }
+
 }

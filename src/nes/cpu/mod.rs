@@ -93,6 +93,11 @@ impl Cpu {
         return self.cycles == 0;
     }
 
+
+    pub fn trigger_nmi(&mut self){
+        self.cycles += self.nmi();
+    }
+
     pub fn tick(&mut self) {
         self.tick_count += 1;
 
@@ -815,10 +820,10 @@ impl Opcode <'_>{
         let mut addr_u16 :u16 = 0xDEAD;
 
         if self.get_opcode_byte_size() == 2 {
-            addr_u8 = cpu.bus.read_ram_opcode(pc_value + 1);
+            addr_u8 = cpu.bus.read_ram_opcode_decoding(pc_value + 1);
         }
         else if self.get_opcode_byte_size() == 3 {
-            addr_u16 = (cpu.bus.read_ram_opcode(pc_value +1) as u16) | ((cpu.bus.read_ram_opcode(pc_value + 2) as u16) << 8);
+            addr_u16 = (cpu.bus.read_ram_opcode_decoding(pc_value +1) as u16) | ((cpu.bus.read_ram_opcode_decoding(pc_value + 2) as u16) << 8);
         }
 
         if self.addr_t as usize == Cpu::addr_ACC as usize {
