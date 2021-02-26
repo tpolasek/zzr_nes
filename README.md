@@ -3,15 +3,15 @@
 NES Emulator written in rust. 
 
 Key planned features include:
-> Cycle accurate PPU and CPU emulation
-> Minimalistic design and boilerplate code
+ Cycle accurate PPU and CPU emulation
+ Minimalistic design and boilerplate code
 
 Completed:
-> 6502 CPU emulation
-> Graphic Framebuffer
-> 1 Controller input
-> Rom Loading
+ 6502 CPU emulation
+ Graphic Framebuffer
+ 1 Controller input
+ Rom Loading
 
 Todo:
-> Emulate PPU core
-> Emulate Sound Core
+ Emulate PPU core
+ Emulate Sound Core
