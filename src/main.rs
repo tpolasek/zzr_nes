@@ -12,7 +12,7 @@ fn main() {
 
 
     let mut nes = Nes::new();
-    nes.execute_rom(&String::from("/home/thomas/code/rustynes/roms/donkey.nes"));
+    nes.execute_rom(&String::from("/Users/thomas/code/zzr_nes/roms/AccuracyCoin.nes"));
     //nes.test_stack();
     //nes.test_loop_performance(100_000_000);
     //nes.test_cycle_cost_with_page_jump();
