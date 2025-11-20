@@ -4,7 +4,6 @@ use super::ram2k::WorkRam;
 use super::rom::Rom;
 use super::ppu::Ppu;
 
-use rand::Rng;
 
 pub struct Bus {
     pub ram2k: Ram2k,

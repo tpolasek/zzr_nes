@@ -1,7 +1,4 @@
-use std::time::Instant;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
-use std::{thread, time};
-use std::io;
 use console::style;
 use crate::nes::controller::Button;
 
@@ -13,12 +10,8 @@ mod ppu;
 mod rom;
 mod cpu_flag;
 
-use bus::Bus;
 use cpu::Cpu;
-use ppu::Ppu;
-use rom::Rom;
-use controller::*;
-use std::io::Write;
+
 
 pub struct Nes {
     cpu: cpu::Cpu,

@@ -2,7 +2,6 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::str;
-use minifb::MouseButton::Middle;
 
 const PRG_BANK_BANK_SIZE :u32 = (1 << 14); // 16384
 const CHR_BANK_BANK_SIZE :u32 = (1 << 13); // 8192
