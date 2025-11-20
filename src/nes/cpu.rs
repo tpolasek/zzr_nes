@@ -1,5 +1,5 @@
-pub mod flag;
 use super::bus::Bus;
+use crate::nes::cpu_flag;
 
 fn decrement_u8(value : u8) -> u8{
     if value == 0 {
@@ -43,7 +43,7 @@ pub struct Cpu {
     pub reg_x: u8,
     pub reg_y: u8,
     pub reg_sp: u8,
-    pub flag: flag::Flag,
+    pub flag: cpu_flag::Flag,
     // other
     pub tick_count: u64,
     pub fetched: u8,
@@ -54,7 +54,7 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new() -> Self {
-        let flag = flag::Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
+        let flag = cpu_flag::Flag {flag_n: 0, flag_v: 0, flag_b: 0, flag_d: 0, flag_i: 0, flag_z: 0, flag_c: 0};
 
         Self {
             bus: Bus::new(),

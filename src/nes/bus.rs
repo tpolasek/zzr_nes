@@ -1,4 +1,4 @@
-use super::controller::Controller;
+use crate::nes::controller::Controller;
 use super::ram2k::Ram2k;
 use super::ram2k::WorkRam;
 use super::rom::Rom;

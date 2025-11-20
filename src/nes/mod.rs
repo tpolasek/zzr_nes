@@ -3,7 +3,7 @@ use minifb::{Key, ScaleMode, Window, WindowOptions};
 use std::{thread, time};
 use std::io;
 use console::style;
-
+use crate::nes::controller::Button;
 
 mod bus;
 mod cpu;
@@ -11,6 +11,7 @@ mod ram2k;
 mod controller;
 mod ppu;
 mod rom;
+mod cpu_flag;
 
 use bus::Bus;
 use cpu::Cpu;
