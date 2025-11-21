@@ -1,7 +1,6 @@
-use minifb::{Key, ScaleMode, Window, WindowOptions};
-use console::style;
-use crate::nes::controller::Button;
-
+use eframe::{egui, App, Frame};
+use egui::{Color32, RichText, TextureHandle, Visuals, Style, FontFamily, FontId, TextStyle};
+use std::{thread, time};
 mod bus;
 mod cpu;
 mod ram2k;
@@ -14,76 +13,333 @@ mod debugger;
 use cpu::Cpu;
 use debugger::Debugger;
 
+struct GUIInstruction {
+    addr: u16,
+    text: String,
+    breakpoint: bool,
+}
 
 pub struct Nes {
     cpu: cpu::Cpu,
-    debugger: debugger::Debugger
+    debugger: debugger::Debugger,
+    step_next_count:u16,
+    memory: Vec<u8>,
+    disasm: Vec<GUIInstruction>,
+    mem_writes: Vec<String>,
+    pc: usize,
+    image: Option<TextureHandle>,
+    ran_instruction: bool
 }
 
 impl Nes {
-    pub fn new() -> Self {
-        let cpu = Cpu::new();
-        let debugger = Debugger::new();
-        Self {
-            cpu,
-            debugger
-        }
+    fn default(filename: &String) -> Self {
+        let mut cpu = Cpu::new();
+        let debugger: Debugger = Debugger::new();
+        let step_next_count: u16 = 0;
+        cpu.bus.rom.load_rom(filename);
+        cpu.reset();
+
+
+        let disasm: Vec<GUIInstruction> = Vec::new();
+
+
+        let mem_writes: Vec<String> = vec![
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+            "WRA0:00FF 34".into(),
+            "WRA0:00FE 12".into(),
+            "WRA0:00FD A0".into(),
+        ];
+    
+        Self {cpu, debugger, step_next_count, memory: Vec::new(), disasm, mem_writes, pc: 0, image: None, ran_instruction: false }
     }
 
-    #[inline(always)]
-    fn execute_cpu_ppu(&mut self){
-        if self.cpu.bus.dma_cycles > 0 {
-            self.cpu.bus.dma_cycles -= 1;
-        }
-        else {
-            if self.cpu.bus.ppu.get_and_reset_nmi_triggered(){
-                self.cpu.trigger_nmi(); // applies nmi instantly, but adds the clock cost
+    pub fn new(ctx: &egui::Context, filename: &String) -> Self {
+        let mut app: Nes = Nes::default(filename);
+
+
+        ctx.set_visuals(Visuals::light());
+
+        let mut fonts = egui::FontDefinitions::default();
+
+        fonts.font_data.insert(
+            "pixel".to_owned(),
+            egui::FontData::from_static(include_bytes!("../ProggyClean.ttf"))
+        );
+
+        fonts.families
+            .get_mut(&egui::FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "pixel".to_owned());
+
+        ctx.set_fonts(fonts);
+
+        let mut style: Style = Style::default();
+
+        style.text_styles.insert(
+            TextStyle::Body, 
+            FontId::new(14.0, FontFamily::Monospace)
+        );
+        style.visuals.panel_fill = Color32::from_rgb(0, 0, 0); // Classic gray
+        style.visuals.override_text_color =  Some(Color32::from_rgb(0, 255, 0)); 
+        style.text_styles.get_mut(&egui::TextStyle::Body).unwrap().size = 16.0;
+        style.text_styles.get_mut(&egui::TextStyle::Button).unwrap().size = 16.0;
+        style.text_styles.get_mut(&egui::TextStyle::Monospace).unwrap().size = 16.0;
+        style.text_styles.get_mut(&egui::TextStyle::Heading).unwrap().size = 16.0;
+        style.text_styles.get_mut(&egui::TextStyle::Small).unwrap().size = 16.0;
+        ctx.set_style(style);
+    
+
+        app
+    }
+}
+
+impl App for Nes {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        self.ran_instruction = false;
+        while self.step_next_count > 0 {
+            self.ran_instruction = true;
+            self.cpu.execute_cpu_ppu();
+            self.step_next_count -= 1;
+            
+             if self.debugger.hit_breakpoint(self.cpu.pc) {
+                // hit breakpoint, stop.
+                self.step_next_count = 0;
+                break;
+             }
+
+            while !self.cpu.ready_to_execute_next_instruction() {
+                self.cpu.execute_cpu_ppu();
             }
-            self.cpu.tick();
         }
+        if(self.ran_instruction){
+            // SUPER SUPER EXPENSIVE.
+          self.memory = (0..0xFFFF).map(|i: u16| self.cpu.bus.read_ram(i)).collect();
+          ctx.request_repaint();
+        }
+        thread::sleep(time::Duration::from_millis(20)); // 50 fps
 
-        self.cpu.bus.ppu.tick();
-        self.cpu.bus.ppu.tick();
-        self.cpu.bus.ppu.tick();
+
+
+        let mut disasm: Vec<GUIInstruction> = Vec::new();
+        let mut pc_addr_scan_ahead = self.cpu.pc;
+
+        // TODO in the past 
+        
+        // in the future
+        for _i in 0..8 {
+            let (instruction_str, instruction_size) = self.cpu.get_cpu_opcode_str(pc_addr_scan_ahead);
+            disasm.push(GUIInstruction { addr : pc_addr_scan_ahead, text : instruction_str, breakpoint: self.debugger.hit_breakpoint(pc_addr_scan_ahead) });
+            pc_addr_scan_ahead += instruction_size;
+        }
+        self.disasm = disasm;
+
+
+        // Render image
+        let size: [usize; 2] = [256usize, 240usize];
+        let buffer = &self.cpu.bus.ppu.gbuffer;
+        let image: egui::ColorImage = egui::ColorImage::from_rgb(size, buffer);
+        self.image = Some(ctx.load_texture(
+            "ppu_preview",
+            image,
+            egui::TextureOptions::default(),
+        ));
+
+        
+        egui::TopBottomPanel::top("top").show(ctx, |ui: &mut egui::Ui| {
+            ui.horizontal(|ui: &mut egui::Ui| {
+                if ui.button("Step").clicked() {self.step_next_count = 1}
+                if ui.button("Big Step").clicked() {self.step_next_count = 1000}
+                // if ui.button("Step Out").clicked() {} TODO step until a branch is true? 
+                if ui.button("Run").clicked() {}
+                if ui.button("Pause").clicked() {self.step_next_count = 0}
+                if ui.button("Reset").clicked() {}
+                if ui.button("Breakpoint").clicked() {}
+            });
+        });
+
+        // Side panel first - spans full vertical space between top and bottom of window
+        egui::SidePanel::right("sidebar")
+            .default_width(250.0)
+            .show(ctx, |ui| {
+                if let Some(tex) = &self.image {
+                    ui.add(
+                        egui::Image::from_texture(tex)
+                            .fit_to_exact_size(egui::vec2(ui.available_width(), 150.0)),
+                    );
+                }
+                ui.add_space(8.0);
+
+                ui.heading("Registers");
+                ui.separator();
+                ui.heading(RichText::new(format!(" A={:02x}",self.cpu.reg_a)));
+                ui.heading(RichText::new(format!(" X={:02x}",self.cpu.reg_x)));
+                ui.heading(RichText::new(format!(" Y={:02x}",self.cpu.reg_y)));
+                ui.heading(RichText::new(format!("SP={:02x}",self.cpu.reg_sp)));
+                ui.heading(RichText::new(format!("PC={:04x}", self.cpu.pc)));
+                ui.heading(RichText::new(format!("{}",self.cpu.flag.get_formatted_str())));
+
+                ui.add_space(8.0);
+                ui.heading("CPU Info");
+                ui.separator();
+                 ui.heading(format!("tick: {}", self.cpu.tick_count as usize));
+                ui.add_space(8.0);
+                ui.heading("Memory Writes");
+                ui.separator();
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.set_min_width(ui.available_width());
+                    for w in &self.mem_writes {
+                        ui.heading(w);
+                    }
+                });
+
+  
+            });
+
+        // Central panel - takes remaining space after sidebar
+        egui::CentralPanel::default()
+            .show(ctx, |ui: &mut egui::Ui| {
+
+
+                ui.push_id(1, |ui| {
+                    // Use a vertical layout to split the central panel
+                    // Disassembly section with its own scroll area
+                    ui.heading("Disassembly");
+                    ui.separator();
+                    
+                    egui::ScrollArea::vertical()
+                        .max_height(400.0) // Set a max height for disassembly section
+                        .show(ui, |ui| {
+                            ui.set_min_width(ui.available_width());
+                            for (intruction_addr, ins) in self.disasm.iter_mut().enumerate() {
+                                let is_pc = intruction_addr == self.pc;
+                                let text: RichText = if ins.breakpoint{
+                                    if is_pc{
+                                    RichText::new(format!(">{:04X}  {}", ins.addr, ins.text))
+                                    .background_color(Color32::LIGHT_BLUE)
+                                    .color(Color32::BLACK)
+                                    }
+                                    else{
+                                    RichText::new(format!(" {:04X}  {}", ins.addr, ins.text))
+                                    .background_color(Color32::LIGHT_RED)
+                                    .color(Color32::BLACK)
+                                    }
+                                }
+                                
+                                else if is_pc {
+                                    RichText::new(format!(">{:04X}  {}", ins.addr, ins.text))
+                                        .background_color(Color32::DEBUG_COLOR)
+                                        .color(Color32::BLACK)
+                                } else {
+                                    RichText::new(format!(" {:04X}  {}", ins.addr, ins.text))
+                                };
+                                let response = ui.selectable_label(ins.breakpoint, text);
+                                if response.clicked() {
+                                    self.debugger.toggle_breakpoint(ins.addr, None);
+                                }
+                                if is_pc {
+                                    response.scroll_to_me(Some(egui::Align::Center));
+                                }
+                            }
+                        });
+
+                });
+                ui.add_space(14.0);
+                ui.push_id(2, |ui| {
+
+                    // Memory Hex Dump section with its own scroll area
+                    ui.heading("Memory Hex Dump");
+                    ui.separator();
+
+
+                    egui::ScrollArea::vertical()
+                        .max_height(300.0) // Set a max height for memory section
+                        .show(ui, |ui| {
+                            ui.set_min_width(ui.available_width());
+
+                            let cols: usize = 16;
+                            let rows: usize = (self.memory.len() + cols - 1) / cols;
+
+                            for r in 0..rows {
+                                ui.horizontal(|ui: &mut egui::Ui| {
+                                    let base = r * cols;
+                                    ui.heading(format!("{:04X}:", base));
+
+                                    for c in 0..cols {
+                                        let idx = base + c;
+                                        if idx < self.memory.len() {
+                                            ui.heading(format!("{:02X}", self.memory[idx]));
+                                        } else {
+                                            ui.heading("  ");
+                                        }
+                                    }
+
+                                    ui.separator();
+                                    let ascii: String = (0..cols)
+                                        .map(|c: usize| {
+                                            let idx = base + c;
+                                            if idx < self.memory.len() {
+                                                let b = self.memory[idx];
+                                                if b.is_ascii_graphic() {
+                                                    b as char
+                                                } else {
+                                                    '.'
+                                                }
+                                            } else {
+                                                ' '
+                                            }
+                                        })
+                                        .collect();
+                                    ui.heading(ascii);
+                                });
+                            }
+                        });
+                });
+            });
     }
+}
 
-    pub fn execute_rom(&mut self, filename: &String){
 
-        use console::Term;
-        let term_writer = Term::stdout();
-        let term_reader = Term::stdout();
-        let mut term_read_buffer: String = String::new();
+/*
+Support Key Presses
+Key::W => self.cpu.bus.controller.pressed(Button::UP),
+Key::A => self.cpu.bus.controller.pressed(Button::LEFT),
+Key::S => self.cpu.bus.controller.pressed(Button::DOWN),
+Key::D => self.cpu.bus.controller.pressed(Button::RIGHT),
+Key::K => self.cpu.bus.controller.pressed(Button::A),
+Key::L => self.cpu.bus.controller.pressed(Button::B),
 
-        let mut button_f6_pressed : bool = false;
-        let mut button_f7_pressed : bool = false;
-        let mut button_f8_pressed : bool = false;
-        let mut button_f9_pressed : bool = false;
 
-        let mut query_break_point : bool = false;
+*/
 
-        let mut step_mode : bool = true;
-        let mut step_next_count : u16 = 0;
 
-        self.cpu.bus.rom.load_rom(filename);
-        self.cpu.reset();
-
-        term_writer.clear_screen().ok();
-        term_writer.write_line("--------------------------------------------------------").ok();
-        term_writer.write_line("--------------------------------------------------------").ok();
-        term_writer.write_line("--------------------------------------------------------").ok();
-
-        let mut gwindow = Window::new(
-            "ZZR",
-            256,
-            240,
-            WindowOptions {
-                resize: false,
-                scale_mode: ScaleMode::UpperLeft,
-                ..WindowOptions::default()
-            },
-        ).expect("Unable to create window");
-        gwindow.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
-        gwindow.set_position(1920/2 - 256,1080/2 - 240);
+        /* 
         while gwindow.is_open() && !gwindow.is_key_down(Key::Escape) {
             if query_break_point {
                 query_break_point = false;
@@ -148,49 +404,5 @@ impl Nes {
                     }
                 }
             }
-
-            gwindow.get_keys().map(|keys| {
-                for t in keys {
-                    match t {
-                        Key::W => self.cpu.bus.controller.pressed(Button::UP),
-                        Key::A => self.cpu.bus.controller.pressed(Button::LEFT),
-                        Key::S => self.cpu.bus.controller.pressed(Button::DOWN),
-                        Key::D => self.cpu.bus.controller.pressed(Button::RIGHT),
-                        Key::K => self.cpu.bus.controller.pressed(Button::A),
-                        Key::L => self.cpu.bus.controller.pressed(Button::B),
-                        Key::F6 => {if !button_f6_pressed {step_mode = true; step_next_count = 400; button_f6_pressed = true;}},
-                        Key::F7 => {if !button_f7_pressed {step_mode = true; step_next_count = 1; button_f7_pressed = true;}},
-                        Key::F8 => {if !button_f8_pressed {step_mode = false; button_f8_pressed = true;}},
-                        Key::F9 => {if !button_f9_pressed {query_break_point = true; button_f9_pressed = true;}},
-                        Key::RightShift => self.cpu.bus.controller.pressed(Button::SELECT),
-                        Key::Enter => self.cpu.bus.controller.pressed(Button::START),
-                        _ => (),
-                    }
-                }
-            });
-
-            gwindow.get_keys_released().map(|keys| {
-                for t in keys {
-                    match t {
-                        Key::W => self.cpu.bus.controller.released(Button::UP),
-                        Key::A => self.cpu.bus.controller.released(Button::LEFT),
-                        Key::S => self.cpu.bus.controller.released(Button::DOWN),
-                        Key::D => self.cpu.bus.controller.released(Button::RIGHT),
-                        Key::K => self.cpu.bus.controller.released(Button::A),
-                        Key::L => self.cpu.bus.controller.released(Button::B),
-                        Key::F6 => {button_f6_pressed = false;},
-                        Key::F7 => {button_f7_pressed = false;},
-                        Key::F8 => {button_f8_pressed = false;},
-                        Key::F9 => {button_f9_pressed = false;},
-                        Key::RightShift => self.cpu.bus.controller.released(Button::SELECT),
-                        Key::Enter => self.cpu.bus.controller.released(Button::START),
-                        _ => (),
-                    }
-                }
-            });
-
-            gwindow.update_with_buffer(&self.cpu.bus.ppu.gbuffer, 256, 240).expect("Failed to update gwindow buffer");
         }
-    }
-
-}
+        */

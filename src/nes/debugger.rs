@@ -69,6 +69,15 @@ impl Debugger {
         self.breakpoints.insert(addr, info_text);
     }
 
+    pub fn toggle_breakpoint(&mut self, addr: u16, info_text: Option<String>){
+        if self.hit_breakpoint(addr){
+            self.remove_breakpoint(addr);
+        }
+        else{
+            self.set_breakpoint(addr, info_text);
+        }
+    }
+
     /// Removes the breakpoint at the given address.
     pub fn remove_breakpoint(&mut self, addr: u16) {
         self.breakpoints.remove(&addr);

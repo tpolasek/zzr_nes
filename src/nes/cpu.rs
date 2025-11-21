@@ -73,6 +73,27 @@ impl Cpu {
         }
     }
 
+    /*
+    CPU -> PPU Integration Point, its kinda weird but basically we call this in our main loop and it will tick both the CPU and PPU
+    Move to the bus??? but the CPU -> bus releation is whack.
+     */
+    #[inline(always)]
+    pub fn execute_cpu_ppu(&mut self){
+        if self.bus.dma_cycles > 0 {
+            self.bus.dma_cycles -= 1;
+        }
+        else {
+            if self.bus.ppu.get_and_reset_nmi_triggered(){
+                self.trigger_nmi(); // applies nmi instantly, but adds the clock cost
+            }
+            self.tick();
+        }
+
+        self.bus.ppu.tick();
+        self.bus.ppu.tick();
+        self.bus.ppu.tick();
+    }
+
     fn write_value(& mut self, value : u8){
         if self.is_accumulator_opcode {
             self.reg_a = value;
