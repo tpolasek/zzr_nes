@@ -2,7 +2,7 @@
 name = "rustynes"
 version = "0.1.0"
 authors = ["Thomas Polasek <tpolasek@invidi.com>"]
-edition = "2018"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,6 +12,8 @@ hex = "0.4.2"
 minifb = "0.19.1"
 rand = "0.8.1"
 console = "0.14.0"
+eframe = "0.24"
+egui = "0.24"
 
 [profile.dev]
 opt-level = 3
