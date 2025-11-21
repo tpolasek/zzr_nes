@@ -9,10 +9,8 @@ use nes::Nes;
 - Setup classes for PPU and controller input, and main loop
 */
 fn main() {
-
-
     let mut nes = Nes::new();
-    nes.execute_rom(&String::from("/Users/thomas/code/zzr_nes/roms/AccuracyCoin.nes"));
+    nes.execute_rom(&String::from("/Users/thomas/code/zzr_nes/roms/all_instrs.nes"));
     //nes.test_stack();
     //nes.test_loop_performance(100_000_000);
     //nes.test_cycle_cost_with_page_jump();
