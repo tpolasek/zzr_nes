@@ -1,4 +1,6 @@
 use crate::nes::rom::{Rom, Mirroring};
+use egui::{Color32, ColorImage};
+
 
 static PALETTE_LOOKUP: [u32; 64] = [
     0x545454, 0x001E74, 0x081090, 0x300088, 0x440064, 0x5C0030, 0x540400, 0x3C1800, 0x202A00, 0x083A00, 0x004000, 0x003C00, 0x00323C, 0x000000, 0x000000, 0x000000,
@@ -20,7 +22,7 @@ pub struct Ppu { // TODO once we are done debugging remove any public methods
     data_buffer: u8,
     pub pixel: u16,
     pub scanline: u16,
-    pub gbuffer: Vec<u8>,
+    pub gbuffer: ColorImage,
     nmi_triggered: bool,
 
     // https://wiki.nesdev.com/w/index.php/PPU_memory_map
@@ -43,7 +45,7 @@ impl Ppu {
             data_buffer : 0,
             pixel: 0,
             scanline: 0,
-            gbuffer: vec![0; 256*240*3],
+            gbuffer: ColorImage::new([256usize, 240usize], Color32::BLACK),
             nmi_triggered: false,
             vram_bank_1: [0; 0x400],
             vram_bank_2: [0; 0x400],
@@ -276,13 +278,12 @@ impl Ppu {
         return PALETTE_LOOKUP[(self.ppuRead(rom,0x3F00 + ((palette as u16) << 2) + (sprite_color_index as u16)) & 0x3F) as usize];
     }
 
+
     pub fn tick(&mut self){
         self.pixel +=1;
         if self.pixel < 256 && self.scanline < 240{
             let offset: usize = (self.pixel + self.scanline*256) as usize; // Careful 240*256 = 61440 close to u16 limit of 65535
-            self.gbuffer[offset*3] = 0xFF; // Red
-            self.gbuffer[offset*3+1] = 0x00; // G
-            self.gbuffer[offset*3+2] = 0x00; // B
+            self.gbuffer.pixels[offset] = Color32::from_rgb(0xFF, 0, 0);
         }
 
         if self.pixel > 340 {

@@ -162,12 +162,9 @@ impl App for Nes {
 
 
         // Render image
-        let size: [usize; 2] = [256usize, 240usize];
-        let buffer = &self.cpu.bus.ppu.gbuffer;
-        let image: egui::ColorImage = egui::ColorImage::from_rgb(size, buffer);
         self.image = Some(ctx.load_texture(
             "ppu_preview",
-            image,
+            self.cpu.bus.ppu.gbuffer.clone(), // TODO look into replacing this clone with arc?
             egui::TextureOptions::default(),
         ));
 
