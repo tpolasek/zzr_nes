@@ -139,7 +139,7 @@ impl App for Nes {
         // TODO in the past 
         
         // in the future
-        for _i in 0..8 {
+        for _i in 0..16 {
             let (instruction_str, instruction_size) = self.cpu.get_cpu_opcode_str(pc_addr_scan_ahead);
             disasm.push(GUIInstruction { addr : pc_addr_scan_ahead, text : instruction_str, breakpoint: self.debugger.hit_breakpoint(pc_addr_scan_ahead) });
             pc_addr_scan_ahead += instruction_size;
@@ -183,17 +183,17 @@ impl App for Nes {
 
                 ui.heading("Registers");
                 ui.separator();
-                ui.heading(RichText::new(format!(" A={:02x}",self.cpu.reg_a)));
-                ui.heading(RichText::new(format!(" X={:02x}",self.cpu.reg_x)));
-                ui.heading(RichText::new(format!(" Y={:02x}",self.cpu.reg_y)));
-                ui.heading(RichText::new(format!("SP={:02x}",self.cpu.reg_sp)));
+                ui.heading(RichText::new(format!(" A={:02X}",self.cpu.reg_a)));
+                ui.heading(RichText::new(format!(" X={:02X}",self.cpu.reg_x)));
+                ui.heading(RichText::new(format!(" Y={:02X}",self.cpu.reg_y)));
+                ui.heading(RichText::new(format!("SP={:02X}",self.cpu.reg_sp)));
                 ui.heading(RichText::new(format!("PC={:04x}", self.cpu.pc)));
                 ui.heading(RichText::new(format!("{}",self.cpu.flag.get_formatted_str())));
 
                 ui.add_space(8.0);
                 ui.heading("CPU Info");
                 ui.separator();
-                 ui.heading(format!("tick: {}", self.cpu.tick_count as usize));
+                 ui.heading(format!("Cycle: {}", self.cpu.tick_count as usize));
                 ui.add_space(8.0);
                 ui.heading("CPU Stack ($0100-$01FF)");
                 ui.separator();
@@ -226,23 +226,23 @@ impl App for Nes {
                                 let is_pc = intruction_addr == self.pc;
                                 let text: RichText = if ins.breakpoint{
                                     if is_pc{
-                                    RichText::new(format!(">{:04X}  {}", ins.addr, ins.text))
+                                    RichText::new(format!(">{}", ins.text))
                                     .background_color(Color32::LIGHT_BLUE)
                                     .color(Color32::BLACK)
                                     }
                                     else{
-                                    RichText::new(format!(" {:04X}  {}", ins.addr, ins.text))
+                                    RichText::new(format!(" {}", ins.text))
                                     .background_color(Color32::LIGHT_RED)
                                     .color(Color32::BLACK)
                                     }
                                 }
                                 
                                 else if is_pc {
-                                    RichText::new(format!(">{:04X}  {}", ins.addr, ins.text))
+                                    RichText::new(format!(">{}", ins.text))
                                         .background_color(Color32::DEBUG_COLOR)
                                         .color(Color32::BLACK)
                                 } else {
-                                    RichText::new(format!(" {:04X}  {}", ins.addr, ins.text))
+                                    RichText::new(format!(" {}", ins.text))
                                 };
                                 let response = ui.selectable_label(ins.breakpoint, text);
                                 if response.clicked() {

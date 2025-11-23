@@ -153,7 +153,7 @@ impl Cpu {
     }
 
     pub fn get_cpu_state_str(&self) -> String{
-        return format!("A={:02x} X={:02x} Y={:02x} SP={:02x} PC={:04x} {}",
+        return format!("A={:02X} X={:02X} Y={:02X} SP={:02X} PC={:04X} {}",
                         self.reg_a, self.reg_x, self.reg_y, self.reg_sp, self.pc,
                         self.flag.get_formatted_str());
     }
@@ -848,44 +848,44 @@ impl Opcode <'_>{
         }
 
         if self.addr_t as usize == Cpu::addr_ACC as usize {
-            return format!("{:04x}: {} {}", pc_value, self.name, "A");
+            return format!("{:04X}: {} {}", pc_value, self.name, "A");
         }
         else if self.addr_t as usize == Cpu::addr_ACC as usize {
-            return format!("{:04x}: {}", pc_value, self.name);
+            return format!("{:04X}: {}", pc_value, self.name);
         }
         else if self.addr_t as usize == Cpu::addr_IMM as usize {
-            return format!("{:04x}: {} #${:02x}", pc_value, self.name, addr_u8);
+            return format!("{:04X}: {} #${:02X}", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_ZPG as usize {
-            return format!("{:04x}: {} ${:02x}", pc_value, self.name, addr_u8);
+            return format!("{:04X}: {} ${:02X}", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_ZPX as usize {
-            return format!("{:04x}: {} ${:02x},X", pc_value, self.name, addr_u8);
+            return format!("{:04X}: {} ${:02X},X", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_ZPY as usize {
-            return format!("{:04x}: {} ${:02x},Y", pc_value, self.name, addr_u8);
+            return format!("{:04X}: {} ${:02X},Y", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_ABS as usize {
-            return format!("{:04x}: {} ${:04x}", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} ${:04X}", pc_value, self.name, addr_u16);
         }
         else if self.addr_t as usize == Cpu::addr_ABX as usize {
-            return format!("{:04x}: {} ${:04x},X", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} ${:04X},X", pc_value, self.name, addr_u16);
         }
         else if self.addr_t as usize == Cpu::addr_ABY as usize {
-            return format!("{:04x}: {} ${:04x},Y", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} ${:04X},Y", pc_value, self.name, addr_u16);
         }
         else if self.addr_t as usize == Cpu::addr_IND as usize {
-            return format!("{:04x}: {} (${:04x})", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} (${:04X})", pc_value, self.name, addr_u16);
         }
         else if self.addr_t as usize == Cpu::addr_IDX as usize {
-            return format!("{:04x}: {} (${:02x}, X)", pc_value, self.name, addr_u8);
+            return format!("{:04X}: {} (${:02X}, X)", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_IDY as usize {
-            return format!("{:04x}: {} (${:02x}), Y", pc_value, self.name, addr_u8);
+            return format!("{:04X}: {} (${:02X}), Y", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_REL as usize {
             // +2 because jump is relative to the address at the end of the opcode
-            return format!("{:04x}: {} (${:04x})", pc_value, self.name, (pc_value as i32) + (addr_u8 as i8) as i32 + 2 );
+            return format!("{:04X}: {} (${:04X})", pc_value, self.name, (pc_value as i32) + (addr_u8 as i8) as i32 + 2 );
         }
         return String::from("???");
     }
