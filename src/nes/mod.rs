@@ -25,7 +25,7 @@ pub struct Nes {
     step_next_count:u16,
     memory: Vec<u8>,
     disasm: Vec<GUIInstruction>,
-    mem_writes: Vec<String>,
+    stack_data: Vec<String>,
     pc: usize,
     image: Option<TextureHandle>,
     ran_instruction: bool
@@ -42,42 +42,9 @@ impl Nes {
 
         let disasm: Vec<GUIInstruction> = Vec::new();
 
-
-        let mem_writes: Vec<String> = vec![
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-            "WRA0:00FF 34".into(),
-            "WRA0:00FE 12".into(),
-            "WRA0:00FD A0".into(),
-        ];
+        let stack_data: Vec<String> = Vec::new();
     
-        Self {cpu, debugger, step_next_count, memory: Vec::new(), disasm, mem_writes, pc: 0, image: None, ran_instruction: false }
+        Self {cpu, debugger, step_next_count, memory: Vec::new(), disasm, stack_data, pc: 0, image: None, ran_instruction: false }
     }
 
     pub fn new(ctx: &egui::Context, filename: &String) -> Self {
@@ -117,6 +84,25 @@ impl Nes {
     
 
         app
+    }
+    
+    fn populate_stack_data(&mut self) {
+        // Update stack data
+        let mut stack_data: Vec<String> = Vec::new();
+        let stack_pointer = self.cpu.reg_sp;
+        
+        // Read stack data from memory (stack is at 0x0100-0x01FF)
+        // Stack grows downward, so we display from current SP position to bottom of stack
+        for stack_addr in (0x0100 + stack_pointer as u16 + 1)..=0x01FF {
+            let value = self.cpu.bus.read_ram(stack_addr);
+    
+            // Format: "SP+offset: address value"
+            let offset = (stack_addr - 0x0100) as u8;
+                
+            stack_data.push(format!("{:02X}: {:02X}", offset, value));
+        }
+        
+        self.stack_data = stack_data;
     }
 }
 
@@ -159,6 +145,8 @@ impl App for Nes {
             pc_addr_scan_ahead += instruction_size;
         }
         self.disasm = disasm;
+
+        self.populate_stack_data();
 
 
         // Render image
@@ -207,12 +195,12 @@ impl App for Nes {
                 ui.separator();
                  ui.heading(format!("tick: {}", self.cpu.tick_count as usize));
                 ui.add_space(8.0);
-                ui.heading("Memory Writes");
+                ui.heading("CPU Stack ($0100-$01FF)");
                 ui.separator();
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     ui.set_min_width(ui.available_width());
-                    for w in &self.mem_writes {
-                        ui.heading(w);
+                    for stack_item in &self.stack_data {
+                        ui.heading(stack_item);
                     }
                 });
 
