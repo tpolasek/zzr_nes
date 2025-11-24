@@ -9,33 +9,41 @@ mod debugger;
 mod ppu;
 mod ram2k;
 mod rom;
+/*
+This file contains the GUI implementation and it is also where we execute the emulator.
+*/
 
+use crate::nes::cpu::Opcode;
 use cpu::Cpu;
 use debugger::Debugger;
 
 struct GUIInstruction {
     addr: u16,
     text: String,
-    breakpoint: bool,
+    breakpoint_pc: bool,
+    breakpoint_memory: bool,
 }
 
 pub struct Nes {
     cpu: cpu::Cpu,
     debugger: debugger::Debugger,
-    step_next_count: u16,
+    step_next_count: u32,
+    step_out_mode: bool,
     memory_dump: String,
     disasm: Vec<GUIInstruction>,
     stack_data: Vec<String>,
-    pc: usize,
+    previous_pc: u16,
     image: Option<TextureHandle>,
     ran_instruction: bool,
+    show_breakpoint_window: bool,
+    breakpoint_addr_input: String,
 }
 
 impl Nes {
     fn default(filename: &String) -> Self {
         let mut cpu = Cpu::new();
         let debugger: Debugger = Debugger::new();
-        let step_next_count: u16 = 0;
+        let step_next_count: u32 = 0;
         cpu.bus.rom.load_rom(filename);
         cpu.reset();
 
@@ -47,17 +55,20 @@ impl Nes {
             cpu,
             debugger,
             step_next_count,
+            step_out_mode: false,
             memory_dump: "".to_string(),
             disasm,
             stack_data,
-            pc: 0,
+            previous_pc: 0,
             image: None,
             ran_instruction: false,
+            show_breakpoint_window: false,
+            breakpoint_addr_input: String::new(),
         }
     }
 
     pub fn new(ctx: &egui::Context, filename: &String) -> Self {
-        let mut app: Nes = Nes::default(filename);
+        let app: Nes = Nes::default(filename);
 
         ctx.set_visuals(Visuals::light());
 
@@ -184,53 +195,97 @@ impl Nes {
     fn ui_action_big_step(&mut self) {
         self.step_next_count = 1000;
     }
-}
+    fn ui_action_step_out(&mut self) {
+        self.step_out_mode = true;
+    }
 
-impl App for Nes {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
-        // Step
-        if ctx.input(|i| i.key_pressed(egui::Key::S)) {
-            self.ui_action_step()
-        }
-
+    fn emulator_execution_loop(&mut self) {
         self.ran_instruction = false;
-        while self.step_next_count > 0 {
-            self.ran_instruction = true;
-            self.cpu.execute_cpu_ppu();
+        while self.step_out_mode || self.step_next_count > 0 {
             self.step_next_count -= 1;
 
-            if self.debugger.hit_breakpoint(self.cpu.pc) {
+            self.previous_pc = self.cpu.pc;
+
+            // Start Core emulation here
+            self.cpu.execute_cpu_ppu();
+            while !self.cpu.ready_to_execute_next_instruction() {
+                self.cpu.execute_cpu_ppu();
+            }
+            self.ran_instruction = true;
+
+            // End Core emulation here
+
+            // Debugger control flow section
+            if self.debugger.hit_breakpoint_pc(self.cpu.pc) {
+                // hit breakpoint, stop.
+                self.step_next_count = 0;
+                break;
+            }
+            let optcode = self.cpu.get_optcode(self.cpu.pc);
+            let memory_accessed_u16 = optcode.get_memory_addr_accessed_u16(&self.cpu, self.cpu.pc);
+            if memory_accessed_u16.is_some()
+                && self.debugger.hit_breakpoint_memory_access(
+                    memory_accessed_u16.expect("We check is_some() how is this possible?"),
+                )
+            {
                 // hit breakpoint, stop.
                 self.step_next_count = 0;
                 break;
             }
 
-            while !self.cpu.ready_to_execute_next_instruction() {
-                self.cpu.execute_cpu_ppu();
+            if self.step_out_mode && self.cpu.get_optcode(self.previous_pc).is_rts() {
+                self.step_out_mode = false;
+                self.step_next_count = 0;
+                break;
             }
         }
-        if (self.ran_instruction) {
+    }
+}
+
+impl App for Nes {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        self.emulator_execution_loop();
+        thread::sleep(time::Duration::from_millis(20)); // 50 fps
+        ctx.request_repaint();
+
+        // Step
+        if ctx.input(|i| i.key_pressed(egui::Key::S)) {
+            self.ui_action_step()
+        }
+
+        if self.ran_instruction {
             // SUPER SUPER EXPENSIVE.
             self.memory_dump = self.generate_memory_dump();
-            ctx.request_repaint();
         }
-        thread::sleep(time::Duration::from_millis(20)); // 50 fps
+
+        let mut addresses_to_disam: Vec<u16> = Vec::new();
+        addresses_to_disam.push(self.previous_pc);
+        for i in 0..16 {
+            addresses_to_disam.push(self.cpu.pc + i);
+        }
 
         let mut disasm: Vec<GUIInstruction> = Vec::new();
-        let mut pc_addr_scan_ahead = self.cpu.pc;
-
-        // TODO in the past
-
+        // TODO get instructions before.
         // in the future
-        for _i in 0..16 {
-            let (instruction_str, instruction_size) =
-                self.cpu.get_cpu_opcode_str(pc_addr_scan_ahead);
+        for pc_addr_scan_ahead in addresses_to_disam {
+            let current_opcode: &Opcode = self.cpu.get_optcode(pc_addr_scan_ahead);
+            let instruction_str =
+                current_opcode.get_instruction_decoded(&self.cpu, pc_addr_scan_ahead);
+
+            //let instruction_size = current_opcode.get_opcode_byte_size();
+
+            let memory_accessed =
+                current_opcode.get_memory_addr_accessed_u16(&self.cpu, pc_addr_scan_ahead);
+
             disasm.push(GUIInstruction {
                 addr: pc_addr_scan_ahead,
                 text: instruction_str,
-                breakpoint: self.debugger.hit_breakpoint(pc_addr_scan_ahead),
+                breakpoint_pc: self.debugger.hit_breakpoint_pc(pc_addr_scan_ahead),
+                breakpoint_memory: (memory_accessed.is_some()
+                    && self
+                        .debugger
+                        .hit_breakpoint_memory_access(memory_accessed.unwrap())),
             });
-            pc_addr_scan_ahead += instruction_size;
         }
         self.disasm = disasm;
 
@@ -251,13 +306,17 @@ impl App for Nes {
                 if ui.button("Big Step").clicked() {
                     self.ui_action_big_step()
                 }
-                // if ui.button("Step Out").clicked() {} TODO step until a branch is true?
+                if ui.button("Step Out").clicked() {
+                    self.ui_action_step_out()
+                }
                 if ui.button("Run").clicked() {}
                 if ui.button("Pause").clicked() {
                     self.step_next_count = 0
                 }
                 if ui.button("Reset").clicked() {}
-                if ui.button("Breakpoint").clicked() {}
+                if ui.button("Breakpoint").clicked() {
+                    self.show_breakpoint_window = !self.show_breakpoint_window;
+                }
             });
         });
 
@@ -312,9 +371,9 @@ impl App for Nes {
                     .max_height(400.0) // Set a max height for disassembly section
                     .show(ui, |ui| {
                         ui.set_min_width(ui.available_width());
-                        for (intruction_addr, ins) in self.disasm.iter_mut().enumerate() {
-                            let is_pc = intruction_addr == self.pc;
-                            let text: RichText = if ins.breakpoint {
+                        for (_, ins) in self.disasm.iter_mut().enumerate() {
+                            let is_pc = ins.addr == self.cpu.pc;
+                            let text: RichText = if ins.breakpoint_pc {
                                 if is_pc {
                                     RichText::new(format!(">{}", ins.text))
                                         .background_color(Color32::LIGHT_BLUE)
@@ -324,6 +383,16 @@ impl App for Nes {
                                         .background_color(Color32::LIGHT_RED)
                                         .color(Color32::BLACK)
                                 }
+                            } else if ins.breakpoint_memory {
+                                if is_pc {
+                                    RichText::new(format!(">{}", ins.text))
+                                        .background_color(Color32::LIGHT_BLUE)
+                                        .color(Color32::BLACK)
+                                } else {
+                                    RichText::new(format!(" {}", ins.text))
+                                        .background_color(Color32::from_rgb(255, 165, 0)) // Orange
+                                        .color(Color32::BLACK)
+                                }
                             } else if is_pc {
                                 RichText::new(format!(">{}", ins.text))
                                     .background_color(Color32::DEBUG_COLOR)
@@ -331,9 +400,9 @@ impl App for Nes {
                             } else {
                                 RichText::new(format!(" {}", ins.text))
                             };
-                            let response = ui.selectable_label(ins.breakpoint, text);
+                            let response = ui.selectable_label(ins.breakpoint_pc, text);
                             if response.clicked() {
-                                self.debugger.toggle_breakpoint(ins.addr, None);
+                                self.debugger.toggle_breakpoint_pc(ins.addr, None);
                             }
                             if is_pc {
                                 response.scroll_to_me(Some(egui::Align::Center));
@@ -359,6 +428,50 @@ impl App for Nes {
                     });
             });
         });
+
+        // Breakpoint Selection Window
+        if self.show_breakpoint_window {
+            egui::Window::new("Breakpoint Selection")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.heading("Address (hex):");
+                        ui.text_edit_singleline(&mut self.breakpoint_addr_input);
+                    });
+                    ui.add_space(8.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Add PC Breakpoint").clicked() {
+                            // Parse the hex address and add PC breakpoint
+                            if let Ok(addr) = u16::from_str_radix(
+                                &self.breakpoint_addr_input.trim_start_matches("0x"),
+                                16,
+                            ) {
+                                self.debugger.toggle_breakpoint_pc(addr, None);
+                                self.breakpoint_addr_input.clear();
+                            }
+                        }
+
+                        if ui.button("Add Memory Breakpoint").clicked() {
+                            // Parse the hex address and add memory breakpoint
+                            if let Ok(addr) = u16::from_str_radix(
+                                &self.breakpoint_addr_input.trim_start_matches("0x"),
+                                16,
+                            ) {
+                                self.debugger.toggle_breakpoint_memory_access(addr, None);
+                                self.breakpoint_addr_input.clear();
+                            }
+                        }
+                    });
+
+                    ui.add_space(8.0);
+
+                    if ui.button("Close").clicked() {
+                        self.show_breakpoint_window = false;
+                    }
+                });
+        }
     }
 }
 

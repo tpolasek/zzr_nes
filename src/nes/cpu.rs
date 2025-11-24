@@ -595,7 +595,7 @@ static OPCODE_LOOKUP: [Opcode; 256] = [
     },
     Opcode {
         name: "RTS",
-        addr_t: Cpu::addr_ACC,
+        addr_t: Cpu::addr_NUL,
         operation: Cpu::op_RTS,
         cycles: 6,
     },
@@ -1668,26 +1668,10 @@ impl Cpu {
         }
     }
 
-    pub fn get_cpu_opcode_str(&mut self, addr: u16) -> (String, u16) {
-        let current_opcode: u8 = self.bus.read_ram(addr);
+    pub fn get_optcode(&self, pc_addr: u16) -> &Opcode {
+        let current_opcode: u8 = self.bus.read_ram_opcode_decoding(pc_addr); // TODO do we need to use the mutable read?
         let opcode: &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
-
-        return (
-            format!("{:20}", opcode.get_instruction_decoded(self, addr)),
-            opcode.get_opcode_byte_size(),
-        );
-    }
-
-    pub fn get_cpu_state_str(&self) -> String {
-        return format!(
-            "A={:02X} X={:02X} Y={:02X} SP={:02X} PC={:04X} {}",
-            self.reg_a,
-            self.reg_x,
-            self.reg_y,
-            self.reg_sp,
-            self.pc,
-            self.flag.get_formatted_str()
-        );
+        return opcode;
     }
 
     fn get_reg_sr(&self) -> u8 {
@@ -1748,6 +1732,11 @@ impl Cpu {
     }
 
     // ---- Start of Memory Access ---- //
+
+    fn addr_NUL(&mut self) -> u8 {
+        self.fetched = self.reg_a; // TODO should we fetch A?
+        return 0;
+    }
 
     // GOOD
     fn addr_ACC(&mut self) -> u8 {
@@ -2350,7 +2339,7 @@ impl Cpu {
     // ---- End of Opcodes ---- //
 }
 
-struct Opcode<'a> {
+pub struct Opcode<'a> {
     name: &'a str,
     addr_t: fn(cpu: &mut Cpu) -> u8,
     operation: fn(cpu: &mut Cpu) -> u8,
@@ -2358,7 +2347,7 @@ struct Opcode<'a> {
 }
 
 impl Opcode<'_> {
-    fn get_address_label(addr: u16) -> String {
+    fn map_known_address_labels(addr: u16) -> String {
         match addr {
             // PPU Registers
             0x2000 => "PPUCTRL".to_string(),
@@ -2409,19 +2398,31 @@ impl Opcode<'_> {
         }
     }
 
-    fn get_instruction_decoded(&self, cpu: &Cpu, pc_value: u16) -> String {
-        let mut addr_u8: u8 = 0xDD;
-        let mut addr_u16: u16 = 0xDEAD;
+    pub fn get_memory_addr_accessed_u16(&self, cpu: &Cpu, pc_value: u16) -> Option<u16> {
+        if self.get_opcode_byte_size() == 3 {
+            Some(
+                (cpu.bus.read_ram_opcode_decoding(pc_value + 1) as u16)
+                    | ((cpu.bus.read_ram_opcode_decoding(pc_value + 2) as u16) << 8),
+            )
+        } else {
+            None
+        }
+    }
 
+    pub fn get_instruction_decoded(&self, cpu: &Cpu, pc_value: u16) -> String {
+        let mut addr_u8: u8 = 0xDD; //TODO fix use of a dead addr
         if self.get_opcode_byte_size() == 2 {
             addr_u8 = cpu.bus.read_ram_opcode_decoding(pc_value + 1);
-        } else if self.get_opcode_byte_size() == 3 {
-            addr_u16 = (cpu.bus.read_ram_opcode_decoding(pc_value + 1) as u16)
-                | ((cpu.bus.read_ram_opcode_decoding(pc_value + 2) as u16) << 8);
         }
-        let addr_u16_str = Self::get_address_label(addr_u16);
 
-        if self.addr_t as usize == Cpu::addr_ACC as usize {
+        let addr_u16: u16 = self
+            .get_memory_addr_accessed_u16(cpu, pc_value)
+            .unwrap_or(0xDEAD); // TODO fix setting this default
+        let addr_u16_str = Self::map_known_address_labels(addr_u16);
+
+        if self.addr_t as usize == Cpu::addr_NUL as usize {
+            return format!("{:04X}: {}", pc_value, self.name);
+        } else if self.addr_t as usize == Cpu::addr_ACC as usize {
             return format!("{:04X}: {} {}", pc_value, self.name, "A");
         } else if self.addr_t as usize == Cpu::addr_ACC as usize {
             return format!("{:04X}: {}", pc_value, self.name);
@@ -2448,16 +2449,16 @@ impl Opcode<'_> {
         } else if self.addr_t as usize == Cpu::addr_REL as usize {
             // +2 because jump is relative to the address at the end of the opcode
             let addr = (pc_value as i32) + (addr_u8 as i8) as i32 + 2;
-            let addr_str = Self::get_address_label(addr as u16);
+            let addr_str = Self::map_known_address_labels(addr as u16);
 
             return format!("{:04X}: {} (${})", pc_value, self.name, addr_str);
         }
         return String::from("???");
     }
 
-    fn get_opcode_byte_size(&self) -> u16 {
+    pub fn get_opcode_byte_size(&self) -> u16 {
         let mut byte_count: u16 = 0;
-        if self.addr_t as usize == Cpu::addr_ACC as usize {
+        if self.addr_t as usize == Cpu::addr_NUL as usize {
             byte_count = 1;
         } else if self.addr_t as usize == Cpu::addr_ACC as usize {
             byte_count = 1;
@@ -2488,5 +2489,9 @@ impl Opcode<'_> {
         assert!(byte_count != 0);
 
         return byte_count;
+    }
+
+    pub fn is_rts(&self) -> bool {
+        self.name == "RTS"
     }
 }
