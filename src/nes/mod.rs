@@ -23,7 +23,7 @@ pub struct Nes {
     cpu: cpu::Cpu,
     debugger: debugger::Debugger,
     step_next_count: u16,
-    memory: Vec<u8>,
+    memory_dump: String,
     disasm: Vec<GUIInstruction>,
     stack_data: Vec<String>,
     pc: usize,
@@ -47,7 +47,7 @@ impl Nes {
             cpu,
             debugger,
             step_next_count,
-            memory: Vec::new(),
+            memory_dump: "".to_string(),
             disasm,
             stack_data,
             pc: 0,
@@ -121,7 +121,7 @@ impl Nes {
         // Read stack data from memory (stack is at 0x0100-0x01FF)
         // Stack grows downward, so we display from current SP position to bottom of stack
         for stack_addr in (0x0100 + stack_pointer as u16 + 1)..=0x01FF {
-            let value = self.cpu.bus.read_ram(stack_addr);
+            let value = self.cpu.bus.read_ram_opcode_decoding(stack_addr);
 
             // Format: "SP+offset: address value"
             let offset = (stack_addr - 0x0100) as u8;
@@ -130,6 +130,52 @@ impl Nes {
         }
 
         self.stack_data = stack_data;
+    }
+
+    fn generate_memory_dump(&self) -> String {
+        let memory: Vec<u8> = (0..0xFFFF)
+            .map(|i: u16| self.cpu.bus.read_ram_opcode_decoding(i))
+            .collect();
+
+        let cols: usize = 16;
+        let rows: usize = (memory.len() + cols - 1) / cols;
+        let mut output = String::new();
+
+        for r in 0..rows {
+            let base = r * cols;
+            output.push_str(&format!("{:04X}: ", base));
+
+            // Hex bytes
+            for c in 0..cols {
+                let idx = base + c;
+                if idx < memory.len() {
+                    output.push_str(&format!("{:02X} ", memory[idx]));
+                } else {
+                    output.push_str("   ");
+                }
+            }
+
+            output.push_str(" | ");
+
+            // ASCII representation
+            for c in 0..cols {
+                let idx = base + c;
+                if idx < memory.len() {
+                    let b = memory[idx];
+                    if b.is_ascii_graphic() {
+                        output.push(b as char);
+                    } else {
+                        output.push('.');
+                    }
+                } else {
+                    output.push(' ');
+                }
+            }
+
+            output.push('\n');
+        }
+
+        output
     }
 }
 
@@ -153,7 +199,7 @@ impl App for Nes {
         }
         if (self.ran_instruction) {
             // SUPER SUPER EXPENSIVE.
-            self.memory = (0..0xFFFF).map(|i: u16| self.cpu.bus.read_ram(i)).collect();
+            self.memory_dump = self.generate_memory_dump();
             ctx.request_repaint();
         }
         thread::sleep(time::Duration::from_millis(20)); // 50 fps
@@ -293,39 +339,11 @@ impl App for Nes {
                     .max_height(300.0) // Set a max height for memory section
                     .show(ui, |ui| {
                         ui.set_min_width(ui.available_width());
-
-                        let cols: usize = 16;
-                        let rows: usize = (self.memory.len() + cols - 1) / cols;
-
-                        for r in 0..rows {
-                            ui.horizontal(|ui: &mut egui::Ui| {
-                                let base = r * cols;
-                                ui.heading(format!("{:04X}:", base));
-
-                                for c in 0..cols {
-                                    let idx = base + c;
-                                    if idx < self.memory.len() {
-                                        ui.heading(format!("{:02X}", self.memory[idx]));
-                                    } else {
-                                        ui.heading("  ");
-                                    }
-                                }
-
-                                ui.separator();
-                                let ascii: String = (0..cols)
-                                    .map(|c: usize| {
-                                        let idx = base + c;
-                                        if idx < self.memory.len() {
-                                            let b = self.memory[idx];
-                                            if b.is_ascii_graphic() { b as char } else { '.' }
-                                        } else {
-                                            ' '
-                                        }
-                                    })
-                                    .collect();
-                                ui.heading(ascii);
-                            });
-                        }
+                        ui.add(
+                            egui::TextEdit::multiline(&mut self.memory_dump.as_str())
+                                .desired_width(ui.available_width())
+                                .font(egui::TextStyle::Small),
+                        );
                     });
             });
         });
