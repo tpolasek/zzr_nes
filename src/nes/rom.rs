@@ -3,33 +3,33 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 
-const PRG_BANK_BANK_SIZE :u32 = (1 << 14); // 16384
-const CHR_BANK_BANK_SIZE :u32 = (1 << 13); // 8192
+const PRG_BANK_BANK_SIZE: u32 = (1 << 14); // 16384
+const CHR_BANK_BANK_SIZE: u32 = (1 << 13); // 8192
 
-const MAX_PRG_BANK_COUNT :u8 = 16; // 1MB
-const MAX_CHR_BANK_COUNT :u8 = 16; // 512KB
+const MAX_PRG_BANK_COUNT: u8 = 16; // 1MB
+const MAX_CHR_BANK_COUNT: u8 = 16; // 512KB
 
-const MAX_PRG_BANK_SIZE:u32 = PRG_BANK_BANK_SIZE * (MAX_PRG_BANK_COUNT as u32);
-const MAX_CHR_BANK_SIZE:u32 = CHR_BANK_BANK_SIZE * (MAX_CHR_BANK_COUNT as u32);
+const MAX_PRG_BANK_SIZE: u32 = PRG_BANK_BANK_SIZE * (MAX_PRG_BANK_COUNT as u32);
+const MAX_CHR_BANK_SIZE: u32 = CHR_BANK_BANK_SIZE * (MAX_CHR_BANK_COUNT as u32);
 
 #[derive(Debug)]
 pub enum Mirroring {
     HORIZONTAL,
     VERTICAL,
-    FOUR_SCREEN
+    FOUR_SCREEN,
 }
 
 pub struct Rom {
-    pub header : [u8; 16],
+    pub header: [u8; 16],
     pub trainer: [u8; 512],
     prg: [u8; MAX_PRG_BANK_SIZE as usize],
     chr: [u8; MAX_CHR_BANK_SIZE as usize],
     pub title: [u8; 128],
     pub title_size: u8,
 
-    pub prg_bank_count : u8,
-    pub chr_bank_count : u8,
-    pub mirroring : Mirroring,
+    pub prg_bank_count: u8,
+    pub chr_bank_count: u8,
+    pub mirroring: Mirroring,
     pub has_battery_ram: bool,
     pub has_trainer: bool,
     pub mapper_number: u8,
@@ -38,7 +38,7 @@ pub struct Rom {
 impl Rom {
     pub fn new() -> Rom {
         Self {
-            header : [0; 16],
+            header: [0; 16],
             trainer: [0; 512],
             prg: [0; MAX_PRG_BANK_SIZE as usize],
             chr: [0; MAX_CHR_BANK_SIZE as usize],
@@ -49,47 +49,48 @@ impl Rom {
             has_trainer: false,
             has_battery_ram: false,
             mapper_number: 0,
-            mirroring: Mirroring::VERTICAL
+            mirroring: Mirroring::VERTICAL,
         }
     }
 
     // todo implement mapper (for READ/WRITE PRG CHR)
-    pub fn read_chr(&self, address : u16) -> u8{
-        return self.chr[(address & ((CHR_BANK_BANK_SIZE as u16)-1)) as usize];
+    pub fn read_chr(&self, address: u16) -> u8 {
+        return self.chr[(address & ((CHR_BANK_BANK_SIZE as u16) - 1)) as usize];
     }
 
-    pub fn read_prg(&self, address : u16) -> u8{
+    pub fn read_prg(&self, address: u16) -> u8 {
         if self.prg_bank_count > 1 {
             return self.prg[(address & 0x7FFF) as usize]; //32kb mask
-        }
-        else {
+        } else {
             return self.prg[(address & 0x3FFF) as usize]; //16kb mask
         }
     }
 
-    pub fn write_prg(&mut self, address : u16, value :u8){
+    pub fn write_prg(&mut self, address: u16, value: u8) {
         if self.prg_bank_count > 1 {
-            self.prg[(address & 0x7FFF) as usize] = value;//32kb mask
-        }
-        else {
+            self.prg[(address & 0x7FFF) as usize] = value; //32kb mask
+        } else {
             self.prg[(address & 0x3FFF) as usize] = value; //16kb mask
         }
     }
 
-
-    pub fn load_rom(&mut self,filename: &String) {
+    pub fn load_rom(&mut self, filename: &String) {
         let mut file_handle = File::open(&filename).expect("no file found");
         let meta_data = fs::metadata(&filename).expect("unable to read metadata");
         let file_length = meta_data.len();
 
         println!("Loading rom: {}", filename);
 
-        file_handle.read_exact(&mut self.header).expect("header buffer overflow");
+        file_handle
+            .read_exact(&mut self.header)
+            .expect("header buffer overflow");
         self.parse_header();
 
         if self.has_trainer {
             println!("Loading trainer");
-            file_handle.read_exact(&mut self.trainer).expect("trainer buffer overflow");
+            file_handle
+                .read_exact(&mut self.trainer)
+                .expect("trainer buffer overflow");
         }
 
         // Load PRG
@@ -117,7 +118,9 @@ impl Rom {
         // Load Title
         {
             let mut buf = vec![0u8; 128 as usize];
-            self.title_size = file_handle.read_to_end(& mut buf).expect("Didn't read enough") as u8;
+            self.title_size = file_handle
+                .read_to_end(&mut buf)
+                .expect("Didn't read enough") as u8;
             for i in 0..self.title_size {
                 self.title[i as usize] = buf[i as usize];
             }
@@ -127,17 +130,22 @@ impl Rom {
         // Verify we are EOF
         {
             let mut buf = vec![0u8; 1024 as usize];
-            let mut buf_size = file_handle.read_to_end(& mut buf).expect("Didn't read enough");
+            let mut buf_size = file_handle
+                .read_to_end(&mut buf)
+                .expect("Didn't read enough");
             if buf_size != 0 {
-                panic!("Found extra '{}' bytes after the title, expected EOF!!", buf_size);
+                panic!(
+                    "Found extra '{}' bytes after the title, expected EOF!!",
+                    buf_size
+                );
             }
         }
     }
 
-    fn parse_header(&mut self){
+    fn parse_header(&mut self) {
         // Parse NES marker
         let nes_header = str::from_utf8(&self.header[0..4]).unwrap();
-        if nes_header != "NES\x1a"{
+        if nes_header != "NES\x1a" {
             panic!("Nes identifier invalid: {}", nes_header);
         }
         println!("NES header validated");
@@ -147,10 +155,16 @@ impl Rom {
         self.chr_bank_count = self.header[5];
 
         if self.prg_bank_count > MAX_PRG_BANK_COUNT {
-            panic!("PRG bank count exceeds limit: {} > {}", self.prg_bank_count, MAX_PRG_BANK_COUNT);
+            panic!(
+                "PRG bank count exceeds limit: {} > {}",
+                self.prg_bank_count, MAX_PRG_BANK_COUNT
+            );
         }
         if self.chr_bank_count > MAX_CHR_BANK_COUNT {
-            panic!("CHR bank count exceeds limit: {} > {}", self.chr_bank_count, MAX_CHR_BANK_COUNT);
+            panic!(
+                "CHR bank count exceeds limit: {} > {}",
+                self.chr_bank_count, MAX_CHR_BANK_COUNT
+            );
         }
 
         println!("PGR Bank Count: {}", self.prg_bank_count);
@@ -171,16 +185,14 @@ impl Rom {
         */
 
         // Mirroring
-        if f6_flags & (1 << 3) != 0{
+        if f6_flags & (1 << 3) != 0 {
             //Bit 3: Ignore mirroring control or above mirroring bit; instead provide four-screen VRAM
             self.mirroring = Mirroring::FOUR_SCREEN;
-        }
-        else{
+        } else {
             // Bit 0: Mirroring
-            if f6_flags & (1 << 0) == 0{
+            if f6_flags & (1 << 0) == 0 {
                 self.mirroring = Mirroring::HORIZONTAL;
-            }
-            else{
+            } else {
                 self.mirroring = Mirroring::VERTICAL;
             }
         }

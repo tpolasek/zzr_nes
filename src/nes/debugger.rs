@@ -56,7 +56,7 @@ impl Debugger {
                 map.insert(0xFFFE, Some("IRQ_VEC_LO".to_string()));
                 map.insert(0xFFFF, Some("IRQ_VEC_HI".to_string()));
                 map
-            }
+            },
         }
     }
 
@@ -69,11 +69,10 @@ impl Debugger {
         self.breakpoints.insert(addr, info_text);
     }
 
-    pub fn toggle_breakpoint(&mut self, addr: u16, info_text: Option<String>){
-        if self.hit_breakpoint(addr){
+    pub fn toggle_breakpoint(&mut self, addr: u16, info_text: Option<String>) {
+        if self.hit_breakpoint(addr) {
             self.remove_breakpoint(addr);
-        }
-        else{
+        } else {
             self.set_breakpoint(addr, info_text);
         }
     }
