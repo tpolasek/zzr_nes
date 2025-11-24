@@ -836,6 +836,57 @@ struct Opcode <'a>{
 }
 
 impl Opcode <'_>{
+     fn get_address_label(addr: u16) -> String {
+        match addr {
+            // PPU Registers
+            0x2000 => "PPUCTRL".to_string(),
+            0x2001 => "PPUMASK".to_string(),
+            0x2002 => "PPUSTATUS".to_string(),
+            0x2003 => "OAMADDR".to_string(),
+            0x2004 => "OAMDATA".to_string(),
+            0x2005 => "PPUSCROLL".to_string(),
+            0x2006 => "PPUADDR".to_string(),
+            0x2007 => "PPUDATA".to_string(),
+            // APU and I/O
+            0x4014 => "OAMDMA".to_string(),
+            0x4015 => "APU_CTRL".to_string(),
+            0x4016 => "JOY1".to_string(),
+            0x4017 => "JOY2".to_string(),
+            // APU Square 1
+            0x4000 => "SQ1_VOL".to_string(),
+            0x4001 => "SQ1_SWEEP".to_string(),
+            0x4002 => "SQ1_LO".to_string(),
+            0x4003 => "SQ1_HI".to_string(),
+            // APU Square 2
+            0x4004 => "SQ2_VOL".to_string(),
+            0x4005 => "SQ2_SWEEP".to_string(),
+            0x4006 => "SQ2_LO".to_string(),
+            0x4007 => "SQ2_HI".to_string(),
+            // APU Triangle
+            0x4008 => "TRI_LINEAR".to_string(),
+            0x400A => "TRI_LO".to_string(),
+            0x400B => "TRI_HI".to_string(),
+            // APU Noise
+            0x400C => "NOISE_VOL".to_string(),
+            0x400E => "NOISE_LO".to_string(),
+            0x400F => "NOISE_HI".to_string(),
+            // APU DMC
+            0x4010 => "DMC_FREQ".to_string(),
+            0x4011 => "DMC_RAW".to_string(),
+            0x4012 => "DMC_START".to_string(),
+            0x4013 => "DMC_LEN".to_string(),
+
+            // Interrupt Vectors
+            0xFFFA => "NMI_VEC_LO".to_string(),
+            0xFFFB => "NMI_VEC_HI".to_string(),
+            0xFFFC => "RESET_VEC_LO".to_string(),
+            0xFFFD => "RESET_VEC_HI".to_string(),
+            0xFFFE => "IRQ_VEC_LO".to_string(),
+            0xFFFF => "IRQ_VEC_HI".to_string(),
+            _ => format!("{:04X}", addr),
+         }
+     }
+
     fn get_instruction_decoded(&self, cpu : & Cpu, pc_value : u16) -> String{
         let mut addr_u8 :u8 = 0xDD;
         let mut addr_u16 :u16 = 0xDEAD;
@@ -846,6 +897,8 @@ impl Opcode <'_>{
         else if self.get_opcode_byte_size() == 3 {
             addr_u16 = (cpu.bus.read_ram_opcode_decoding(pc_value +1) as u16) | ((cpu.bus.read_ram_opcode_decoding(pc_value + 2) as u16) << 8);
         }
+        let addr_u16_str = Self::get_address_label(addr_u16);
+
 
         if self.addr_t as usize == Cpu::addr_ACC as usize {
             return format!("{:04X}: {} {}", pc_value, self.name, "A");
@@ -866,16 +919,16 @@ impl Opcode <'_>{
             return format!("{:04X}: {} ${:02X},Y", pc_value, self.name, addr_u8);
         }
         else if self.addr_t as usize == Cpu::addr_ABS as usize {
-            return format!("{:04X}: {} ${:04X}", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} ${}", pc_value, self.name, addr_u16_str);
         }
         else if self.addr_t as usize == Cpu::addr_ABX as usize {
-            return format!("{:04X}: {} ${:04X},X", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} ${},X", pc_value, self.name, addr_u16_str);
         }
         else if self.addr_t as usize == Cpu::addr_ABY as usize {
-            return format!("{:04X}: {} ${:04X},Y", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} ${},Y", pc_value, self.name, addr_u16_str);
         }
         else if self.addr_t as usize == Cpu::addr_IND as usize {
-            return format!("{:04X}: {} (${:04X})", pc_value, self.name, addr_u16);
+            return format!("{:04X}: {} (${})", pc_value, self.name, addr_u16_str);
         }
         else if self.addr_t as usize == Cpu::addr_IDX as usize {
             return format!("{:04X}: {} (${:02X}, X)", pc_value, self.name, addr_u8);
@@ -885,7 +938,10 @@ impl Opcode <'_>{
         }
         else if self.addr_t as usize == Cpu::addr_REL as usize {
             // +2 because jump is relative to the address at the end of the opcode
-            return format!("{:04X}: {} (${:04X})", pc_value, self.name, (pc_value as i32) + (addr_u8 as i8) as i32 + 2 );
+            let addr = (pc_value as i32) + (addr_u8 as i8) as i32 + 2;
+            let addr_str = Self::get_address_label(addr as u16);
+
+            return format!("{:04X}: {} (${})", pc_value, self.name,  addr_str);
         }
         return String::from("???");
     }
