@@ -177,10 +177,22 @@ impl Nes {
 
         output
     }
+
+    fn ui_action_step(&mut self) {
+        self.step_next_count = 1;
+    }
+    fn ui_action_big_step(&mut self) {
+        self.step_next_count = 1000;
+    }
 }
 
 impl App for Nes {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        // Step
+        if ctx.input(|i| i.key_pressed(egui::Key::S)) {
+            self.ui_action_step()
+        }
+
         self.ran_instruction = false;
         while self.step_next_count > 0 {
             self.ran_instruction = true;
@@ -234,10 +246,10 @@ impl App for Nes {
         egui::TopBottomPanel::top("top").show(ctx, |ui: &mut egui::Ui| {
             ui.horizontal(|ui: &mut egui::Ui| {
                 if ui.button("Step").clicked() {
-                    self.step_next_count = 1
+                    self.ui_action_step()
                 }
                 if ui.button("Big Step").clicked() {
-                    self.step_next_count = 1000
+                    self.ui_action_big_step()
                 }
                 // if ui.button("Step Out").clicked() {} TODO step until a branch is true?
                 if ui.button("Run").clicked() {}
@@ -358,74 +370,4 @@ Key::S => self.cpu.bus.controller.pressed(Button::DOWN),
 Key::D => self.cpu.bus.controller.pressed(Button::RIGHT),
 Key::K => self.cpu.bus.controller.pressed(Button::A),
 Key::L => self.cpu.bus.controller.pressed(Button::B),
-
-
-*/
-
-/*
-while gwindow.is_open() && !gwindow.is_key_down(Key::Escape) {
-    if query_break_point {
-        query_break_point = false;
-
-        term_writer.move_cursor_up(2).ok();
-        term_writer.write_line("Set breakpoint address in hex format 0000: ").ok();
-        term_read_buffer = term_reader.read_line().ok().unwrap();
-        term_writer.clear_last_lines(2).ok();
-
-
-        // Set breakpoint here
-        let break_point_addr = (u32::from_str_radix(&term_read_buffer, 16).unwrap() & 0xFFFF) as u16;
-        self.debugger.set_breakpoint(break_point_addr,None);
-
-        term_writer.write_line(&format!("Set breakpoint to: 0x{:04x}", break_point_addr)).ok();
-        term_writer.move_cursor_down(1).ok();
-    }
-    if step_mode {
-        while step_next_count > 0 {
-            self.execute_cpu_ppu();
-            step_next_count -= 1;
-
-            while !self.cpu.ready_to_execute_next_instruction() {
-                self.execute_cpu_ppu();
-            }
-        }
-        let mut pc_addr_scan_ahead = self.cpu.pc;
-        for i in 0..16 {
-            let (instruction_str, instruction_size) = self.cpu.get_cpu_opcode_str(pc_addr_scan_ahead);
-            if i == 0 {
-                term_writer.write_line(&format!("{} {}", style(instruction_str).red(), style(self.cpu.get_cpu_state_str()).white())).ok();
-            } else {
-                term_writer.write_line(&format!("{}", style(instruction_str).cyan())).ok();
-            }
-            pc_addr_scan_ahead += instruction_size;
-        }
-        term_writer.write_line(&format!("Tick Count: {}", style(self.cpu.tick_count).yellow())).ok();
-        term_writer.move_cursor_up(16 + 1 ).ok();
-    }
-    else {
-        // Loop mode until Vblank exit
-        let mut hit_vblank = false;
-        loop {
-            // Hit breakpoint
-            if self.debugger.hit_breakpoint(self.cpu.pc) {
-                term_writer.move_cursor_up(2).ok();
-                term_writer.clear_line().ok();
-                //term_writer.write_line(&format!("{} {:04x}!",style("Hit Breakpoint at").green(), style(break_point_addr).green())).ok();
-                term_writer.move_cursor_down(1).ok();
-                step_mode = true;
-                step_next_count = 0;
-                break;
-            }
-
-            self.execute_cpu_ppu();
-
-            if self.cpu.bus.ppu.is_vblank() {
-                hit_vblank = true;
-            } else if hit_vblank {
-                // Just exited the vblank
-                break;
-            }
-        }
-    }
-}
 */
