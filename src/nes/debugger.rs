@@ -10,7 +10,7 @@ impl Debugger {
         Self {
             breakpoints_pc: HashMap::new(),
             breakpoints_memory_access: {
-                let mut map = HashMap::new();
+                let map = HashMap::new();
                 //map.insert(0xEC10, None);
                 map
             },

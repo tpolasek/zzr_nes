@@ -1659,7 +1659,7 @@ impl Cpu {
             self.pc += 1;
 
             let opcode: &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
-            self.is_accumulator_opcode = (opcode.addr_t as usize == Cpu::addr_ACC as usize);
+            self.is_accumulator_opcode = opcode.addr_t as usize == Cpu::addr_ACC as usize;
 
             self.cycles += (opcode.addr_t as fn(cpu: &mut Cpu) -> u8)(self);
             self.cycles += (opcode.operation as fn(cpu: &mut Cpu) -> u8)(self);
@@ -1668,16 +1668,18 @@ impl Cpu {
         }
     }
 
-    pub fn get_optcode(&self, pc_addr: u16) -> &Opcode {
+    pub fn get_optcode(&self, pc_addr: u16) -> &Opcode<'_> {
         let current_opcode: u8 = self.bus.read_ram_opcode_decoding(pc_addr); // TODO do we need to use the mutable read?
         let opcode: &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
         return opcode;
     }
 
+    #[allow(dead_code)]
     fn get_reg_sr(&self) -> u8 {
         return self.flag.get_sr();
     }
 
+    #[allow(dead_code)]
     pub fn run_until_interrupt(&mut self) {
         loop {
             self.tick();
@@ -1698,6 +1700,7 @@ impl Cpu {
         return 8;
     }
 
+    #[allow(dead_code)]
     pub fn irq(&mut self) -> u8 {
         if self.flag.get_flag_i() {
             return 0;
@@ -1841,7 +1844,7 @@ impl Cpu {
         let abs_addr_lo = self.bus.read_ram(ptr_addr) as u16;
         let abs_addr_hi = self.bus.read_ram(ptr_addr + 1) as u16;
 
-        self.abs_addr = (abs_addr_hi << 8 | abs_addr_lo);
+        self.abs_addr = abs_addr_hi << 8 | abs_addr_lo;
 
         return 0;
     }
@@ -2266,12 +2269,11 @@ impl Cpu {
     fn op_CMP(&mut self) -> u8 {
         self.fetch();
 
-        let mut result: u8 = 0;
-        if self.reg_a < self.fetched {
-            result = 0xFF - (self.fetched - self.reg_a);
+        let result: u8 = if self.reg_a < self.fetched {
+            0xFF - (self.fetched - self.reg_a)
         } else {
-            result = self.reg_a - self.fetched;
-        }
+            self.reg_a - self.fetched
+        };
 
         self.flag.set_flag_c(self.reg_a >= self.fetched);
         self.flag.set_flag_z(self.reg_a == self.fetched);
@@ -2282,12 +2284,11 @@ impl Cpu {
     fn op_CPX(&mut self) -> u8 {
         self.fetch();
 
-        let mut result: u8 = 0;
-        if self.reg_x < self.fetched {
-            result = 0xFF - (self.fetched - self.reg_x);
+        let result: u8 = if self.reg_x < self.fetched {
+            0xFF - (self.fetched - self.reg_x)
         } else {
-            result = self.reg_x - self.fetched;
-        }
+            self.reg_x - self.fetched
+        };
 
         self.flag.set_flag_c(self.reg_x >= self.fetched);
         self.flag.set_flag_z(self.reg_x == self.fetched);
@@ -2298,12 +2299,11 @@ impl Cpu {
     fn op_CPY(&mut self) -> u8 {
         self.fetch();
 
-        let mut result: u8 = 0;
-        if self.reg_y < self.fetched {
-            result = 0xFF - (self.fetched - self.reg_y);
+        let result: u8 = if self.reg_y < self.fetched {
+            0xFF - (self.fetched - self.reg_y)
         } else {
-            result = self.reg_y - self.fetched;
-        }
+            self.reg_y - self.fetched
+        };
 
         self.flag.set_flag_c(self.reg_y >= self.fetched);
         self.flag.set_flag_z(self.reg_y == self.fetched);

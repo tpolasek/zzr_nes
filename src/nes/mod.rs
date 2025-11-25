@@ -234,6 +234,7 @@ impl Nes {
             }
 
             if self.step_out_mode && self.cpu.get_optcode(self.previous_pc).is_rts() {
+                // hit RTS in step out mode, stop.
                 self.step_out_mode = false;
                 self.step_next_count = 0;
                 break;
@@ -259,8 +260,10 @@ impl App for Nes {
         }
 
         let mut addresses_to_disam: Vec<u16> = Vec::new();
-        addresses_to_disam.push(self.previous_pc);
-        for i in 0..16 {
+        if self.previous_pc != 0 && self.previous_pc != self.cpu.pc {
+            addresses_to_disam.push(self.previous_pc);
+        }
+        for i in 0..40 {
             addresses_to_disam.push(self.cpu.pc + i);
         }
 
@@ -404,7 +407,7 @@ impl App for Nes {
                             if response.clicked() {
                                 self.debugger.toggle_breakpoint_pc(ins.addr, None);
                             }
-                            if is_pc {
+                            if is_pc && self.ran_instruction {
                                 response.scroll_to_me(Some(egui::Align::Center));
                             }
                         }

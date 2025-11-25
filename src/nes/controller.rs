@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub enum Button {
     UP,
     DOWN,
@@ -38,14 +39,17 @@ impl Controller {
             strobe_high: true,
         }
     }
+    #[allow(dead_code)]
     pub fn pressed(&mut self, button: Button) {
         self.button_change(button, true);
     }
 
+    #[allow(dead_code)]
     pub fn released(&mut self, button: Button) {
         self.button_change(button, false);
     }
 
+    #[allow(dead_code)]
     fn button_change(&mut self, button: Button, pressed: bool) {
         let value: u8 = match pressed {
             true => 1,
@@ -85,7 +89,7 @@ impl Controller {
     }
 
     pub fn write(&mut self, value: u8) {
-        self.strobe_high = (value & 0x01 != 0);
+        self.strobe_high = value & 0x01 != 0;
         if self.strobe_high {
             self.read_counter = 0;
         }

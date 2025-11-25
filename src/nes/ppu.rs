@@ -1,6 +1,7 @@
 use crate::nes::rom::{Mirroring, Rom};
 use egui::{Color32, ColorImage};
 
+#[allow(dead_code)]
 static PALETTE_LOOKUP: [u32; 64] = [
     0x545454, 0x001E74, 0x081090, 0x300088, 0x440064, 0x5C0030, 0x540400, 0x3C1800, 0x202A00,
     0x083A00, 0x004000, 0x003C00, 0x00323C, 0x000000, 0x000000, 0x000000, 0x989698, 0x084CC4,
@@ -12,8 +13,8 @@ static PALETTE_LOOKUP: [u32; 64] = [
     0x000000,
 ];
 
-const PPU_STATUS_VBLANK_BIT: u8 = (1 << 7);
-const PPU_CTRL_NMI_TRIGGER_BIT: u8 = (1 << 7);
+const PPU_STATUS_VBLANK_BIT: u8 = 1 << 7;
+const PPU_CTRL_NMI_TRIGGER_BIT: u8 = 1 << 7;
 
 pub struct Ppu {
     // TODO once we are done debugging remove any public methods
@@ -58,11 +59,12 @@ impl Ppu {
         }
     }
 
+    #[allow(dead_code)]
     pub fn is_vblank(&self) -> bool {
         return self.reg_status & PPU_STATUS_VBLANK_BIT != 0;
     }
 
-    pub fn cpuReadImmutable(&self, rom: &Rom, register_num: u8) -> u8 {
+    pub fn cpuReadImmutable(&self, _rom: &Rom, register_num: u8) -> u8 {
         return match register_num {
             0 => self.read_PPUCTRL_Immutable(),
             1 => self.read_PPUMASK_Immutable(),
@@ -94,7 +96,7 @@ impl Ppu {
         };
     }
 
-    pub fn cpuWrite(&mut self, rom: &mut Rom, register_num: u8, value: u8) {
+    pub fn cpuWrite(&mut self, _rom: &mut Rom, register_num: u8, value: u8) {
         match register_num {
             0 => self.write_PPUCTRL(value),
             1 => self.write_PPUMASK(value),
@@ -119,7 +121,7 @@ impl Ppu {
             0x2000..=0x3EFF => {
                 let tmp_addr = address & 0xFFF;
 
-                return match rom.mirroring {
+                match rom.mirroring {
                     Mirroring::HORIZONTAL => {
                         if tmp_addr <= 0x7FF {
                             return self.vram_bank_1[(tmp_addr & 0x3FF) as usize];
@@ -140,11 +142,11 @@ impl Ppu {
                             return self.vram_bank_2[(tmp_addr & 0x3FF) as usize];
                         }
                     }
-                    Mirroring::FOUR_SCREEN => {
+                    Mirroring::FourScreen => {
                         // TODO implement, also need SINGLE SCREEN
                         return 0;
                     }
-                };
+                }
             }
             0x3F00..=0x3FFF => {
                 let mut tmp_addr = address & 0x1F;
@@ -166,7 +168,8 @@ impl Ppu {
         };
     }
 
-    fn ppuWrite(&self, address: u16, value: u8) {
+    #[allow(dead_code)]
+    fn ppuWrite(&self, _address: u16, _value: u8) {
         return; //TODO this is incomplete
     }
 
@@ -241,16 +244,16 @@ impl Ppu {
     fn write_PPUMASK(&mut self, value: u8) {
         self.reg_mask = value;
     }
-    fn write_PPUSTATUS(&mut self, value: u8) {
+    fn write_PPUSTATUS(&mut self, _value: u8) {
         //TODO
     }
-    fn write_OAMADDR(&mut self, value: u8) {
+    fn write_OAMADDR(&mut self, _value: u8) {
         //TODO
     }
-    fn write_OAMDATA(&mut self, value: u8) {
+    fn write_OAMDATA(&mut self, _value: u8) {
         //TODO
     }
-    fn write_PPUSCROLL(&mut self, value: u8) {
+    fn write_PPUSCROLL(&mut self, _value: u8) {
         //TODO
     }
     fn write_PPUADDR(&mut self, value: u8) {
@@ -270,10 +273,11 @@ impl Ppu {
         self.data_buffer = value; // sets LSB 5 bits in the STATUS Register
     }
 
-    fn write_PPUDATA(&mut self, value: u8) {
+    fn write_PPUDATA(&mut self, _value: u8) {
         // do nothing?
     }
 
+    #[allow(dead_code)]
     fn get_color(&self, rom: &Rom, palette: u8, sprite_color_index: u8) -> u32 {
         // 4 colors per palette, sprite_color_index indexes into the palette
         return PALETTE_LOOKUP[(self.ppuRead(

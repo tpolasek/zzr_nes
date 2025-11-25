@@ -49,7 +49,6 @@ impl Bus {
                 return self.rom.read_prg(location);
             }
         }
-        return 0;
     }
 
     pub fn read_ram(&mut self, location: u16) -> u8 {
@@ -63,12 +62,15 @@ impl Bus {
             }
             0x4000..=0x4013 => {
                 // APU
+                return 0;
             }
             0x4014 => {
                 // OAMDMA
+                return 0;
             }
             0x4015 => {
                 // SND_CHN
+                return 0;
             }
             0x4016 => {
                 // Controller 1
@@ -80,9 +82,11 @@ impl Bus {
             }
             0x4018..=0x401F => {
                 //Unused APU and I/O functionality
+                return 0;
             }
             0x4020..=0x5FFF => {
                 //empty on mapper 0?
+                return 0;
             }
             0x6000..=0x7FFF => {
                 return self.workram.memory[(location & 0x1FFF) as usize];
@@ -91,7 +95,6 @@ impl Bus {
                 return self.rom.read_prg(location);
             }
         }
-        return 0;
     }
 
     pub fn write_ram(&mut self, location: u16, value: u8) {
@@ -147,12 +150,14 @@ impl Bus {
         self.dma_cycles = 513; // TODO should be 513, 514 depending on CPU tick
     }
 
+    #[allow(dead_code)]
     pub fn reset_ram(&mut self) {
         for addr in 0..=0xFFFF {
             self.write_ram(addr, 0x00);
         }
     }
 
+    #[allow(dead_code)]
     pub fn print_ram(&mut self, start: u16, length: u16) {
         println!("\nMemory: start=0x{:04x} length=0x{:04x}", start, length);
         let mut counter: u32 = 0;

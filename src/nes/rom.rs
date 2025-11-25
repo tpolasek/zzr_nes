@@ -3,8 +3,8 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 
-const PRG_BANK_BANK_SIZE: u32 = (1 << 14); // 16384
-const CHR_BANK_BANK_SIZE: u32 = (1 << 13); // 8192
+const PRG_BANK_BANK_SIZE: u32 = 1 << 14; // 16384
+const CHR_BANK_BANK_SIZE: u32 = 1 << 13; // 8192
 
 const MAX_PRG_BANK_COUNT: u8 = 16; // 1MB
 const MAX_CHR_BANK_COUNT: u8 = 16; // 512KB
@@ -16,7 +16,7 @@ const MAX_CHR_BANK_SIZE: u32 = CHR_BANK_BANK_SIZE * (MAX_CHR_BANK_COUNT as u32);
 pub enum Mirroring {
     HORIZONTAL,
     VERTICAL,
-    FOUR_SCREEN,
+    FourScreen,
 }
 
 pub struct Rom {
@@ -77,7 +77,7 @@ impl Rom {
     pub fn load_rom(&mut self, filename: &String) {
         let mut file_handle = File::open(&filename).expect("no file found");
         let meta_data = fs::metadata(&filename).expect("unable to read metadata");
-        let file_length = meta_data.len();
+        let _file_length = meta_data.len();
 
         println!("Loading rom: {}", filename);
 
@@ -130,7 +130,7 @@ impl Rom {
         // Verify we are EOF
         {
             let mut buf = vec![0u8; 1024 as usize];
-            let mut buf_size = file_handle
+            let buf_size = file_handle
                 .read_to_end(&mut buf)
                 .expect("Didn't read enough");
             if buf_size != 0 {
@@ -187,7 +187,7 @@ impl Rom {
         // Mirroring
         if f6_flags & (1 << 3) != 0 {
             //Bit 3: Ignore mirroring control or above mirroring bit; instead provide four-screen VRAM
-            self.mirroring = Mirroring::FOUR_SCREEN;
+            self.mirroring = Mirroring::FourScreen;
         } else {
             // Bit 0: Mirroring
             if f6_flags & (1 << 0) == 0 {
@@ -206,7 +206,7 @@ impl Rom {
         self.has_trainer = f6_flags & (1 << 2) != 0;
         println!("Trainer: {:?}", self.has_trainer);
 
-        self.mapper_number = (f6_flags >> 4);
+        self.mapper_number = f6_flags >> 4;
         println!("Mapper number: {:?}", self.mapper_number);
     }
 
