@@ -1669,7 +1669,7 @@ impl Cpu {
     }
 
     pub fn get_optcode(&self, pc_addr: u16) -> &Opcode<'_> {
-        let current_opcode: u8 = self.bus.read_ram_opcode_decoding(pc_addr); // TODO do we need to use the mutable read?
+        let current_opcode: u8 = self.bus.read_ram_immutable_debug(pc_addr); // TODO do we need to use the mutable read?
         let opcode: &Opcode = &OPCODE_LOOKUP[current_opcode as usize];
         return opcode;
     }
@@ -1726,11 +1726,13 @@ impl Cpu {
         self.reg_y = 0;
         self.reg_sp = 0xFD;
         self.flag.set_sr(0);
+        self.flag.set_flag_i(true); // Interrupt Disable flag set on reset
 
         self.abs_addr = 0x0000;
         self.relative_addr_offset = 0x00;
         self.fetched = 0x00;
 
+        self.tick_count = 0;
         self.cycles = 7;
     }
 
@@ -2401,8 +2403,8 @@ impl Opcode<'_> {
     pub fn get_memory_addr_accessed_u16(&self, cpu: &Cpu, pc_value: u16) -> Option<u16> {
         if self.get_opcode_byte_size() == 3 {
             Some(
-                (cpu.bus.read_ram_opcode_decoding(pc_value + 1) as u16)
-                    | ((cpu.bus.read_ram_opcode_decoding(pc_value + 2) as u16) << 8),
+                (cpu.bus.read_ram_immutable_debug(pc_value + 1) as u16)
+                    | ((cpu.bus.read_ram_immutable_debug(pc_value + 2) as u16) << 8),
             )
         } else {
             None
@@ -2412,7 +2414,7 @@ impl Opcode<'_> {
     pub fn get_instruction_decoded(&self, cpu: &Cpu, pc_value: u16) -> String {
         let mut addr_u8: u8 = 0xDD; //TODO fix use of a dead addr
         if self.get_opcode_byte_size() == 2 {
-            addr_u8 = cpu.bus.read_ram_opcode_decoding(pc_value + 1);
+            addr_u8 = cpu.bus.read_ram_immutable_debug(pc_value + 1);
         }
 
         let addr_u16: u16 = self

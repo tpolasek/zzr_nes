@@ -30,7 +30,7 @@ impl Bus {
     /*
     This function does not have any side effects
     */
-    pub fn read_ram_opcode_decoding(&self, location: u16) -> u8 {
+    pub fn read_ram_immutable_debug(&self, location: u16) -> u8 {
         // mapper 0
         match location {
             0x0000..=0x1FFF => {

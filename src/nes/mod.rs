@@ -132,7 +132,7 @@ impl Nes {
         // Read stack data from memory (stack is at 0x0100-0x01FF)
         // Stack grows downward, so we display from current SP position to bottom of stack
         for stack_addr in (0x0100 + stack_pointer as u16 + 1)..=0x01FF {
-            let value = self.cpu.bus.read_ram_opcode_decoding(stack_addr);
+            let value = self.cpu.bus.read_ram_immutable_debug(stack_addr);
 
             // Format: "SP+offset: address value"
             let offset = (stack_addr - 0x0100) as u8;
@@ -145,7 +145,7 @@ impl Nes {
 
     fn generate_memory_dump(&self) -> String {
         let memory: Vec<u8> = (0..0xFFFF)
-            .map(|i: u16| self.cpu.bus.read_ram_opcode_decoding(i))
+            .map(|i: u16| self.cpu.bus.read_ram_immutable_debug(i))
             .collect();
 
         let cols: usize = 16;
@@ -187,6 +187,40 @@ impl Nes {
         }
 
         output
+    }
+    fn generate_opcode_diassembly(&mut self) {
+        let mut addresses_to_disam: Vec<u16> = Vec::new();
+        if self.previous_pc != 0 && self.previous_pc != self.cpu.pc {
+            addresses_to_disam.push(self.previous_pc);
+        }
+        for i in 0..40 {
+            addresses_to_disam.push(self.cpu.pc + i);
+        }
+
+        let mut disasm: Vec<GUIInstruction> = Vec::new();
+        // TODO get instructions before.
+        // in the future
+        for pc_addr_scan_ahead in addresses_to_disam {
+            let current_opcode: &Opcode = self.cpu.get_optcode(pc_addr_scan_ahead);
+            let instruction_str =
+                current_opcode.get_instruction_decoded(&self.cpu, pc_addr_scan_ahead);
+
+            //let instruction_size = current_opcode.get_opcode_byte_size();
+
+            let memory_accessed =
+                current_opcode.get_memory_addr_accessed_u16(&self.cpu, pc_addr_scan_ahead);
+
+            disasm.push(GUIInstruction {
+                addr: pc_addr_scan_ahead,
+                text: instruction_str,
+                breakpoint_pc: self.debugger.hit_breakpoint_pc(pc_addr_scan_ahead),
+                breakpoint_memory: (memory_accessed.is_some()
+                    && self
+                        .debugger
+                        .hit_breakpoint_memory_access(memory_accessed.unwrap())),
+            });
+        }
+        self.disasm = disasm;
     }
 
     fn ui_action_step(&mut self) {
@@ -249,50 +283,18 @@ impl App for Nes {
         thread::sleep(time::Duration::from_millis(20)); // 50 fps
         ctx.request_repaint();
 
-        // Step
+        if self.ran_instruction {
+            // SUPER SUPER EXPENSIVE, this scans the entire memory map
+            self.memory_dump = self.generate_memory_dump();
+        }
+        self.generate_opcode_diassembly();
+        self.populate_stack_data();
+
+        // Start Keyboard Hooks
         if ctx.input(|i| i.key_pressed(egui::Key::S)) {
             self.ui_action_step()
         }
-
-        if self.ran_instruction {
-            // SUPER SUPER EXPENSIVE.
-            self.memory_dump = self.generate_memory_dump();
-        }
-
-        let mut addresses_to_disam: Vec<u16> = Vec::new();
-        if self.previous_pc != 0 && self.previous_pc != self.cpu.pc {
-            addresses_to_disam.push(self.previous_pc);
-        }
-        for i in 0..40 {
-            addresses_to_disam.push(self.cpu.pc + i);
-        }
-
-        let mut disasm: Vec<GUIInstruction> = Vec::new();
-        // TODO get instructions before.
-        // in the future
-        for pc_addr_scan_ahead in addresses_to_disam {
-            let current_opcode: &Opcode = self.cpu.get_optcode(pc_addr_scan_ahead);
-            let instruction_str =
-                current_opcode.get_instruction_decoded(&self.cpu, pc_addr_scan_ahead);
-
-            //let instruction_size = current_opcode.get_opcode_byte_size();
-
-            let memory_accessed =
-                current_opcode.get_memory_addr_accessed_u16(&self.cpu, pc_addr_scan_ahead);
-
-            disasm.push(GUIInstruction {
-                addr: pc_addr_scan_ahead,
-                text: instruction_str,
-                breakpoint_pc: self.debugger.hit_breakpoint_pc(pc_addr_scan_ahead),
-                breakpoint_memory: (memory_accessed.is_some()
-                    && self
-                        .debugger
-                        .hit_breakpoint_memory_access(memory_accessed.unwrap())),
-            });
-        }
-        self.disasm = disasm;
-
-        self.populate_stack_data();
+        // End Keyboard Hooks
 
         // Render image
         self.image = Some(ctx.load_texture(
@@ -316,7 +318,12 @@ impl App for Nes {
                 if ui.button("Pause").clicked() {
                     self.step_next_count = 0
                 }
-                if ui.button("Reset").clicked() {}
+                if ui.button("Reset").clicked() {
+                    self.cpu.reset();
+                    self.previous_pc = 0;
+                    self.step_next_count = 0;
+                    self.step_out_mode = false;
+                }
                 if ui.button("Breakpoint").clicked() {
                     self.show_breakpoint_window = !self.show_breakpoint_window;
                 }
