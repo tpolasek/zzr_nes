@@ -1,4 +1,4 @@
-use super::bus::Bus;
+use crate::nes::bus::Bus;
 use crate::nes::cpu_flag;
 
 fn decrement_u8(value: u8) -> u8 {

@@ -1,8 +1,8 @@
-use super::ppu::Ppu;
-use super::ram2k::Ram2k;
-use super::ram2k::WorkRam;
-use super::rom::Rom;
 use crate::nes::controller::Controller;
+use crate::nes::ppu::Ppu;
+use crate::nes::ram2k::Ram2k;
+use crate::nes::ram2k::WorkRam;
+use crate::nes::rom::Rom;
 
 pub struct Bus {
     pub ram2k: Ram2k,
