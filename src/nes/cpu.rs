@@ -2412,14 +2412,7 @@ impl Opcode<'_> {
         }
     }
 
-    pub fn get_instruction_decoded(&self, cpu: &Cpu, debugger: &Debugger, pc_value: u16) -> String {
-        let mut addr_u8: u8 = 0xDD; //TODO fix use of a dead addr
-        if self.get_opcode_byte_size() == 2 {
-            addr_u8 = cpu.bus.read_ram_immutable_debug(pc_value + 1);
-        }
-
-        let addr_u16: Option<u16> = self.get_memory_addr_accessed_u16(cpu, pc_value);
-
+    pub fn map_addr_labels(&self, debugger: &Debugger, addr_u16: Option<u16>) -> String {
         let addr_u16_mapped_str = if let Some(addr) = addr_u16 {
             Self::map_known_address_labels(addr)
                 .or_else(|| {
@@ -2427,10 +2420,21 @@ impl Opcode<'_> {
                         .check_symbol_at_memory_access(addr)
                         .then(|| debugger.get_symbol_at_memory_access(addr))
                 })
-                .unwrap_or_else(|| format!("${:04X}", addr))
+                .unwrap_or_else(|| format!("{:04X}", addr))
         } else {
             String::new()
         };
+        return addr_u16_mapped_str;
+    }
+
+    pub fn get_instruction_decoded(&self, cpu: &Cpu, debugger: &Debugger, pc_value: u16) -> String {
+        let mut addr_u8: u8 = 0xDD; //TODO fix use of a dead addr
+        if self.get_opcode_byte_size() == 2 {
+            addr_u8 = cpu.bus.read_ram_immutable_debug(pc_value + 1);
+        }
+
+        let addr_u16: Option<u16> = self.get_memory_addr_accessed_u16(cpu, pc_value);
+        let addr_u16_mapped_str = self.map_addr_labels(debugger, addr_u16);
 
         if self.addr_t as usize == Cpu::addr_NUL as usize {
             return format!("{:04X}: {}", pc_value, self.name);
@@ -2460,9 +2464,9 @@ impl Opcode<'_> {
             return format!("{:04X}: {} (${:02X}), Y", pc_value, self.name, addr_u8);
         } else if self.addr_t as usize == Cpu::addr_REL as usize {
             // +2 because jump is relative to the address at the end of the opcode
-            let addr = (pc_value as i32) + (addr_u8 as i8) as i32 + 2;
-            let addr_str =
-                Self::map_known_address_labels(addr as u16).unwrap_or(format!("{:04X}", addr));
+            let addr = ((pc_value as i32) + (addr_u8 as i8) as i32 + 2) as u16;
+
+            let addr_str = self.map_addr_labels(debugger, Some(addr));
 
             return format!("{:04X}: {} (${})", pc_value, self.name, addr_str);
         }

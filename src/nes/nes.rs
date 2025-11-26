@@ -182,18 +182,18 @@ impl Nes {
         output
     }
     fn generate_opcode_diassembly(&mut self) {
+        /*
         let mut addresses_to_disam: Vec<u16> = Vec::new();
         if self.previous_pc != 0 && self.previous_pc != self.cpu.pc {
             addresses_to_disam.push(self.previous_pc);
         }
-        for i in 0..40 {
-            addresses_to_disam.push(self.cpu.pc + i);
-        }
+        */
 
         let mut disasm: Vec<GUIInstruction> = Vec::new();
         // TODO get instructions before.
         // in the future
-        for pc_addr_scan_ahead in addresses_to_disam {
+        let mut pc_addr_scan_ahead = self.cpu.pc;
+        for _index in 0..40 {
             let current_opcode: &Opcode = self.cpu.get_optcode(pc_addr_scan_ahead);
             let instruction_str = current_opcode.get_instruction_decoded(
                 &self.cpu,
@@ -218,6 +218,7 @@ impl Nes {
                         .debugger
                         .hit_breakpoint_memory_access(memory_accessed.unwrap())),
             });
+            pc_addr_scan_ahead += current_opcode.get_opcode_byte_size();
         }
         self.disasm = disasm;
     }
