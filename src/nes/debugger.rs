@@ -1,20 +1,27 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 
 pub struct Debugger {
     breakpoints_pc: HashMap<u16, Option<String>>,
     breakpoints_memory_access: HashMap<u16, Option<String>>,
+    debug_symbols: HashMap<u16, String>,
 }
 
 impl Debugger {
-    pub fn new() -> Self {
+    pub fn new(debug_file: Option<&String>) -> Self {
         Self {
             breakpoints_pc: HashMap::new(),
             breakpoints_memory_access: {
                 let map = HashMap::new();
                 //map.insert(0xEC10, None);
                 map
+            },
+            debug_symbols: {
+                if debug_file.is_some() {
+                    Debugger::load_debug_symbol(debug_file.unwrap())
+                } else {
+                    std::collections::HashMap::new()
+                }
             },
         }
     }
@@ -59,7 +66,19 @@ impl Debugger {
         self.breakpoints_pc.remove(&addr);
     }
 
-    pub fn load_debug_symbol<P: AsRef<Path>>(debug_file_path: P) -> HashMap<u16, String> {
+    pub fn check_symbol_at_memory_access(&self, addr: u16) -> bool {
+        self.debug_symbols.contains_key(&addr)
+    }
+
+    pub fn get_symbol_at_memory_access(&self, addr: u16) -> String {
+        let default = String::new();
+        self.debug_symbols
+            .get(&addr)
+            .unwrap_or(&default)
+            .to_string()
+    }
+
+    pub fn load_debug_symbol(debug_file_path: &String) -> HashMap<u16, String> {
         let mut symbols = HashMap::new();
 
         // Try to read the debug file
@@ -96,7 +115,9 @@ impl Debugger {
                     // Extract hex value
                     let val_str = &part[4..]; // Skip "val="
                     // Parse hex string (e.g., "0x850C")
-                    if let Ok(parsed_val) = u16::from_str_radix(val_str.trim_start_matches("0x"), 16) {
+                    if let Ok(parsed_val) =
+                        u16::from_str_radix(val_str.trim_start_matches("0x"), 16)
+                    {
                         val = Some(parsed_val);
                     }
                 }

@@ -1,5 +1,6 @@
 use crate::nes::bus::Bus;
 use crate::nes::cpu_flag;
+use crate::nes::debugger::Debugger;
 
 fn decrement_u8(value: u8) -> u8 {
     if value == 0 {
@@ -2349,54 +2350,54 @@ pub struct Opcode<'a> {
 }
 
 impl Opcode<'_> {
-    fn map_known_address_labels(addr: u16) -> String {
+    fn map_known_address_labels(addr: u16) -> Option<String> {
         match addr {
             // PPU Registers
-            0x2000 => "PPUCTRL".to_string(),
-            0x2001 => "PPUMASK".to_string(),
-            0x2002 => "PPUSTATUS".to_string(),
-            0x2003 => "OAMADDR".to_string(),
-            0x2004 => "OAMDATA".to_string(),
-            0x2005 => "PPUSCROLL".to_string(),
-            0x2006 => "PPUADDR".to_string(),
-            0x2007 => "PPUDATA".to_string(),
+            0x2000 => Some("PPUCTRL".to_string()),
+            0x2001 => Some("PPUMASK".to_string()),
+            0x2002 => Some("PPUSTATUS".to_string()),
+            0x2003 => Some("OAMADDR".to_string()),
+            0x2004 => Some("OAMDATA".to_string()),
+            0x2005 => Some("PPUSCROLL".to_string()),
+            0x2006 => Some("PPUADDR".to_string()),
+            0x2007 => Some("PPUDATA".to_string()),
             // APU and I/O
-            0x4014 => "OAMDMA".to_string(),
-            0x4015 => "APU_CTRL".to_string(),
-            0x4016 => "JOY1".to_string(),
-            0x4017 => "JOY2".to_string(),
+            0x4014 => Some("OAMDMA".to_string()),
+            0x4015 => Some("APU_CTRL".to_string()),
+            0x4016 => Some("JOY1".to_string()),
+            0x4017 => Some("JOY2".to_string()),
             // APU Square 1
-            0x4000 => "SQ1_VOL".to_string(),
-            0x4001 => "SQ1_SWEEP".to_string(),
-            0x4002 => "SQ1_LO".to_string(),
-            0x4003 => "SQ1_HI".to_string(),
+            0x4000 => Some("SQ1_VOL".to_string()),
+            0x4001 => Some("SQ1_SWEEP".to_string()),
+            0x4002 => Some("SQ1_LO".to_string()),
+            0x4003 => Some("SQ1_HI".to_string()),
             // APU Square 2
-            0x4004 => "SQ2_VOL".to_string(),
-            0x4005 => "SQ2_SWEEP".to_string(),
-            0x4006 => "SQ2_LO".to_string(),
-            0x4007 => "SQ2_HI".to_string(),
+            0x4004 => Some("SQ2_VOL".to_string()),
+            0x4005 => Some("SQ2_SWEEP".to_string()),
+            0x4006 => Some("SQ2_LO".to_string()),
+            0x4007 => Some("SQ2_HI".to_string()),
             // APU Triangle
-            0x4008 => "TRI_LINEAR".to_string(),
-            0x400A => "TRI_LO".to_string(),
-            0x400B => "TRI_HI".to_string(),
+            0x4008 => Some("TRI_LINEAR".to_string()),
+            0x400A => Some("TRI_LO".to_string()),
+            0x400B => Some("TRI_HI".to_string()),
             // APU Noise
-            0x400C => "NOISE_VOL".to_string(),
-            0x400E => "NOISE_LO".to_string(),
-            0x400F => "NOISE_HI".to_string(),
+            0x400C => Some("NOISE_VOL".to_string()),
+            0x400E => Some("NOISE_LO".to_string()),
+            0x400F => Some("NOISE_HI".to_string()),
             // APU DMC
-            0x4010 => "DMC_FREQ".to_string(),
-            0x4011 => "DMC_RAW".to_string(),
-            0x4012 => "DMC_START".to_string(),
-            0x4013 => "DMC_LEN".to_string(),
+            0x4010 => Some("DMC_FREQ".to_string()),
+            0x4011 => Some("DMC_RAW".to_string()),
+            0x4012 => Some("DMC_START".to_string()),
+            0x4013 => Some("DMC_LEN".to_string()),
 
             // Interrupt Vectors
-            0xFFFA => "NMI_VEC_LO".to_string(),
-            0xFFFB => "NMI_VEC_HI".to_string(),
-            0xFFFC => "RESET_VEC_LO".to_string(),
-            0xFFFD => "RESET_VEC_HI".to_string(),
-            0xFFFE => "IRQ_VEC_LO".to_string(),
-            0xFFFF => "IRQ_VEC_HI".to_string(),
-            _ => format!("{:04X}", addr),
+            0xFFFA => Some("NMI_VEC_LO".to_string()),
+            0xFFFB => Some("NMI_VEC_HI".to_string()),
+            0xFFFC => Some("RESET_VEC_LO".to_string()),
+            0xFFFD => Some("RESET_VEC_HI".to_string()),
+            0xFFFE => Some("IRQ_VEC_LO".to_string()),
+            0xFFFF => Some("IRQ_VEC_HI".to_string()),
+            _ => None,
         }
     }
 
@@ -2411,16 +2412,25 @@ impl Opcode<'_> {
         }
     }
 
-    pub fn get_instruction_decoded(&self, cpu: &Cpu, pc_value: u16) -> String {
+    pub fn get_instruction_decoded(&self, cpu: &Cpu, debugger: &Debugger, pc_value: u16) -> String {
         let mut addr_u8: u8 = 0xDD; //TODO fix use of a dead addr
         if self.get_opcode_byte_size() == 2 {
             addr_u8 = cpu.bus.read_ram_immutable_debug(pc_value + 1);
         }
 
-        let addr_u16: u16 = self
-            .get_memory_addr_accessed_u16(cpu, pc_value)
-            .unwrap_or(0xDEAD); // TODO fix setting this default
-        let addr_u16_str = Self::map_known_address_labels(addr_u16);
+        let addr_u16: Option<u16> = self.get_memory_addr_accessed_u16(cpu, pc_value);
+
+        let addr_u16_mapped_str = if let Some(addr) = addr_u16 {
+            Self::map_known_address_labels(addr)
+                .or_else(|| {
+                    debugger
+                        .check_symbol_at_memory_access(addr)
+                        .then(|| debugger.get_symbol_at_memory_access(addr))
+                })
+                .unwrap_or_else(|| format!("${:04X}", addr))
+        } else {
+            String::new()
+        };
 
         if self.addr_t as usize == Cpu::addr_NUL as usize {
             return format!("{:04X}: {}", pc_value, self.name);
@@ -2437,13 +2447,13 @@ impl Opcode<'_> {
         } else if self.addr_t as usize == Cpu::addr_ZPY as usize {
             return format!("{:04X}: {} ${:02X},Y", pc_value, self.name, addr_u8);
         } else if self.addr_t as usize == Cpu::addr_ABS as usize {
-            return format!("{:04X}: {} ${}", pc_value, self.name, addr_u16_str);
+            return format!("{:04X}: {} ${}", pc_value, self.name, addr_u16_mapped_str);
         } else if self.addr_t as usize == Cpu::addr_ABX as usize {
-            return format!("{:04X}: {} ${},X", pc_value, self.name, addr_u16_str);
+            return format!("{:04X}: {} ${},X", pc_value, self.name, addr_u16_mapped_str);
         } else if self.addr_t as usize == Cpu::addr_ABY as usize {
-            return format!("{:04X}: {} ${},Y", pc_value, self.name, addr_u16_str);
+            return format!("{:04X}: {} ${},Y", pc_value, self.name, addr_u16_mapped_str);
         } else if self.addr_t as usize == Cpu::addr_IND as usize {
-            return format!("{:04X}: {} (${})", pc_value, self.name, addr_u16_str);
+            return format!("{:04X}: {} (${})", pc_value, self.name, addr_u16_mapped_str);
         } else if self.addr_t as usize == Cpu::addr_IDX as usize {
             return format!("{:04X}: {} (${:02X}, X)", pc_value, self.name, addr_u8);
         } else if self.addr_t as usize == Cpu::addr_IDY as usize {
@@ -2451,7 +2461,8 @@ impl Opcode<'_> {
         } else if self.addr_t as usize == Cpu::addr_REL as usize {
             // +2 because jump is relative to the address at the end of the opcode
             let addr = (pc_value as i32) + (addr_u8 as i8) as i32 + 2;
-            let addr_str = Self::map_known_address_labels(addr as u16);
+            let addr_str =
+                Self::map_known_address_labels(addr as u16).unwrap_or(format!("{:04X}", addr));
 
             return format!("{:04X}: {} (${})", pc_value, self.name, addr_str);
         }
@@ -2495,8 +2506,5 @@ impl Opcode<'_> {
 
     pub fn is_rts(&self) -> bool {
         self.name == "RTS"
-    }
-    pub fn is_jump(&self) -> bool {
-        self.name == "JMP" || self.name == "JSR"
     }
 }
