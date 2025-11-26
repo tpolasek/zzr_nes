@@ -204,13 +204,22 @@ impl Nes {
         // in the future
         for pc_addr_scan_ahead in addresses_to_disam {
             let current_opcode: &Opcode = self.cpu.get_optcode(pc_addr_scan_ahead);
-            let instruction_str =
+            let mut instruction_str =
                 current_opcode.get_instruction_decoded(&self.cpu, pc_addr_scan_ahead);
 
             //let instruction_size = current_opcode.get_opcode_byte_size();
 
             let memory_accessed =
                 current_opcode.get_memory_addr_accessed_u16(&self.cpu, pc_addr_scan_ahead);
+
+            if current_opcode.is_jump() && memory_accessed.is_some() {
+                let memory_access_symbol =
+                    self.debug_symbols.get(&memory_accessed.expect("Checked"));
+                if memory_access_symbol.is_some() {
+                    instruction_str.push_str(" ----> ");
+                    instruction_str.push_str(memory_access_symbol.expect("Checked"));
+                }
+            }
 
             let symbol = self
                 .debug_symbols

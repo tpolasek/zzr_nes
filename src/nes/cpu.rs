@@ -2496,4 +2496,7 @@ impl Opcode<'_> {
     pub fn is_rts(&self) -> bool {
         self.name == "RTS"
     }
+    pub fn is_jump(&self) -> bool {
+        self.name == "JMP" || self.name == "JSR"
+    }
 }

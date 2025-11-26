@@ -143,7 +143,7 @@ impl Bus {
         let cpu_start_address = (value as u16) << 8;
 
         // We copy the data right away, normally this would happen on a per tick basis
-        for i in 0..=0xFF {
+        for i in 0..0xFF {
             self.ppu.oam_ram[i] = self.read_ram(cpu_start_address + (i as u16));
         }
 
