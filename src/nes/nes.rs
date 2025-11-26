@@ -314,7 +314,9 @@ impl App for Nes {
                 if ui.button("Step Out").clicked() {
                     self.ui_action_step_out()
                 }
-                if ui.button("Run").clicked() {}
+                if ui.button("Run").clicked() {
+                    self.step_next_count = u32::MAX;
+                }
                 if ui.button("Pause").clicked() {
                     self.step_next_count = 0
                 }

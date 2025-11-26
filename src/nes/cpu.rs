@@ -2407,6 +2407,16 @@ impl Opcode<'_> {
                 (cpu.bus.read_ram_immutable_debug(pc_value + 1) as u16)
                     | ((cpu.bus.read_ram_immutable_debug(pc_value + 2) as u16) << 8),
             )
+        } else if self.get_opcode_byte_size() == 2 {
+            if self.addr_t as usize == Cpu::addr_REL as usize {
+                Some(
+                    ((pc_value as i32)
+                        + (cpu.bus.read_ram_immutable_debug(pc_value + 1) as i8) as i32
+                        + 2) as u16,
+                )
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -2439,11 +2449,12 @@ impl Opcode<'_> {
         if self.addr_t as usize == Cpu::addr_NUL as usize {
             return format!("{:04X}: {}", pc_value, self.name);
         } else if self.addr_t as usize == Cpu::addr_ACC as usize {
-            return format!("{:04X}: {} {}", pc_value, self.name, "A");
-        } else if self.addr_t as usize == Cpu::addr_ACC as usize {
             return format!("{:04X}: {}", pc_value, self.name);
         } else if self.addr_t as usize == Cpu::addr_IMM as usize {
-            return format!("{:04X}: {} #${:02X}", pc_value, self.name, addr_u8);
+            return format!(
+                "{:04X}: {} #${:02X} (#{:02})",
+                pc_value, self.name, addr_u8, addr_u8
+            );
         } else if self.addr_t as usize == Cpu::addr_ZPG as usize {
             return format!("{:04X}: {} ${:02X}", pc_value, self.name, addr_u8);
         } else if self.addr_t as usize == Cpu::addr_ZPX as usize {
@@ -2451,7 +2462,12 @@ impl Opcode<'_> {
         } else if self.addr_t as usize == Cpu::addr_ZPY as usize {
             return format!("{:04X}: {} ${:02X},Y", pc_value, self.name, addr_u8);
         } else if self.addr_t as usize == Cpu::addr_ABS as usize {
-            return format!("{:04X}: {} ${}", pc_value, self.name, addr_u16_mapped_str);
+            return format!(
+                "{:04X}: {} ${}",
+                pc_value,
+                self.name,
+                format!("{:04X}", addr_u16.unwrap())
+            );
         } else if self.addr_t as usize == Cpu::addr_ABX as usize {
             return format!("{:04X}: {} ${},X", pc_value, self.name, addr_u16_mapped_str);
         } else if self.addr_t as usize == Cpu::addr_ABY as usize {
@@ -2463,12 +2479,7 @@ impl Opcode<'_> {
         } else if self.addr_t as usize == Cpu::addr_IDY as usize {
             return format!("{:04X}: {} (${:02X}), Y", pc_value, self.name, addr_u8);
         } else if self.addr_t as usize == Cpu::addr_REL as usize {
-            // +2 because jump is relative to the address at the end of the opcode
-            let addr = ((pc_value as i32) + (addr_u8 as i8) as i32 + 2) as u16;
-
-            let addr_str = self.map_addr_labels(debugger, Some(addr));
-
-            return format!("{:04X}: {} (${})", pc_value, self.name, addr_str);
+            return format!("{:04X}: {} (${})", pc_value, self.name, addr_u16_mapped_str);
         }
         return String::from("???");
     }

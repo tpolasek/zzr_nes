@@ -15,7 +15,10 @@ console = "0.14.0"
 eframe = "0.24"
 egui = "0.24"
 
+[profile.release]
+debug = true
+
 [profile.dev]
-opt-level = 3
+opt-level = 0 # Set to 3 for max perf
 overflow-checks = false     # false => Disable integer overflow checks.
 
