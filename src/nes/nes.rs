@@ -1,5 +1,6 @@
 use eframe::{App, Frame, egui};
 use egui::{Color32, FontFamily, FontId, RichText, Style, TextStyle, TextureHandle, Visuals};
+use std::collections::HashMap;
 use std::{thread, time};
 /*
 This file contains the GUI implementation and it is also where we execute the emulator.
@@ -12,6 +13,7 @@ use crate::nes::debugger::Debugger;
 struct GUIInstruction {
     addr: u16,
     text: String,
+    symbol: String,
     breakpoint_pc: bool,
     breakpoint_memory: bool,
 }
@@ -19,6 +21,7 @@ struct GUIInstruction {
 pub struct Nes {
     cpu: Cpu,
     debugger: Debugger,
+    debug_symbols: HashMap<u16, String>,
     step_next_count: u32,
     step_out_mode: bool,
     memory_dump: String,
@@ -32,12 +35,18 @@ pub struct Nes {
 }
 
 impl Nes {
-    fn default(filename: &String) -> Self {
+    fn default(filename: &String, debug_file: Option<&String>) -> Self {
         let mut cpu = Cpu::new();
         let debugger: Debugger = Debugger::new();
         let step_next_count: u32 = 0;
         cpu.bus.rom.load_rom(filename);
         cpu.reset();
+
+        let debug_symbols = if let Some(path) = debug_file {
+            Debugger::load_debug_symbol(path)
+        } else {
+            HashMap::new()
+        };
 
         let disasm: Vec<GUIInstruction> = Vec::new();
 
@@ -46,6 +55,7 @@ impl Nes {
         Self {
             cpu,
             debugger,
+            debug_symbols,
             step_next_count,
             step_out_mode: false,
             memory_dump: "".to_string(),
@@ -59,8 +69,8 @@ impl Nes {
         }
     }
 
-    pub fn new(ctx: &egui::Context, filename: &String) -> Self {
-        let app: Nes = Nes::default(filename);
+    pub fn new(ctx: &egui::Context, filename: &String, debug_file: Option<&String>) -> Self {
+        let app: Nes = Nes::default(filename, debug_file);
 
         ctx.set_visuals(Visuals::light());
 
@@ -202,9 +212,16 @@ impl Nes {
             let memory_accessed =
                 current_opcode.get_memory_addr_accessed_u16(&self.cpu, pc_addr_scan_ahead);
 
+            let symbol = self
+                .debug_symbols
+                .get(&pc_addr_scan_ahead)
+                .cloned()
+                .unwrap_or_else(|| "".to_string());
+
             disasm.push(GUIInstruction {
                 addr: pc_addr_scan_ahead,
                 text: instruction_str,
+                symbol,
                 breakpoint_pc: self.debugger.hit_breakpoint_pc(pc_addr_scan_ahead),
                 breakpoint_memory: (memory_accessed.is_some()
                     && self
@@ -377,30 +394,30 @@ impl App for Nes {
                             let is_pc = ins.addr == self.cpu.pc;
                             let text: RichText = if ins.breakpoint_pc {
                                 if is_pc {
-                                    RichText::new(format!(">{}", ins.text))
+                                    RichText::new(format!(">{}\t\t{}", ins.text, ins.symbol))
                                         .background_color(Color32::LIGHT_BLUE)
                                         .color(Color32::BLACK)
                                 } else {
-                                    RichText::new(format!(" {}", ins.text))
+                                    RichText::new(format!(" {}\t\t{}", ins.text, ins.symbol))
                                         .background_color(Color32::LIGHT_RED)
                                         .color(Color32::BLACK)
                                 }
                             } else if ins.breakpoint_memory {
                                 if is_pc {
-                                    RichText::new(format!(">{}", ins.text))
+                                    RichText::new(format!(">{}\t\t{}", ins.text, ins.symbol))
                                         .background_color(Color32::LIGHT_BLUE)
                                         .color(Color32::BLACK)
                                 } else {
-                                    RichText::new(format!(" {}", ins.text))
+                                    RichText::new(format!(" {}\t\t{}", ins.text, ins.symbol))
                                         .background_color(Color32::from_rgb(255, 165, 0)) // Orange
                                         .color(Color32::BLACK)
                                 }
                             } else if is_pc {
-                                RichText::new(format!(">{}", ins.text))
+                                RichText::new(format!(">{}\t\t{}", ins.text, ins.symbol))
                                     .background_color(Color32::DEBUG_COLOR)
                                     .color(Color32::BLACK)
                             } else {
-                                RichText::new(format!(" {}", ins.text))
+                                RichText::new(format!(" {}\t\t{}", ins.text, ins.symbol))
                             };
                             let response = ui.selectable_label(ins.breakpoint_pc, text);
                             if response.clicked() {
