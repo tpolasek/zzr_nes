@@ -14,20 +14,14 @@ fn main() {
         viewport: egui::ViewportBuilder::default().with_inner_size([850.0, 768.0]), // Set width and height here
         ..Default::default()
     };
-    let filename = &String::from("/Users/thomas/code/nes_tests/nmi_interrupt/build/build.nes");
+    let filename = &String::from("/Users/thomas/Downloads/donkeykong.nes");
     let debug_file = &String::from("/Users/thomas/code/nes_tests/nmi_interrupt/build/build.dbg");
     let filename_owned = filename.clone();
     let debug_file_owned = debug_file.clone();
     let _result = eframe::run_native(
         "ZNES",
         opts,
-        Box::new(move |cc| {
-            Box::new(Nes::new(
-                &cc.egui_ctx,
-                &filename_owned,
-                Some(&debug_file_owned),
-            ))
-        }),
+        Box::new(move |cc| Box::new(Nes::new(&cc.egui_ctx, &filename_owned, None))),
     );
 
     //nes.test_stack();

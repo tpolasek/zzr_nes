@@ -20,6 +20,7 @@ struct GUIInstruction {
 pub struct Nes {
     cpu: Cpu,
     debugger: Debugger,
+    running: bool,
     step_next_count: u32,
     step_out_mode: bool,
     memory_dump: String,
@@ -38,6 +39,8 @@ impl Nes {
         let debugger: Debugger = Debugger::new(debug_file);
         let step_next_count: u32 = 0;
         cpu.bus.rom.load_rom(filename);
+        // Set PPU mirroring from ROM
+        cpu.bus.ppu.set_mirroring(cpu.bus.rom.mirroring);
         cpu.reset();
 
         let disasm: Vec<GUIInstruction> = Vec::new();
@@ -47,6 +50,7 @@ impl Nes {
         Self {
             cpu,
             debugger,
+            running: false,
             step_next_count,
             step_out_mode: false,
             memory_dump: "".to_string(),
@@ -202,7 +206,7 @@ impl Nes {
             );
 
             let memory_accessed =
-                current_opcode.get_memory_addr_accessed_u16(&self.cpu, pc_addr_scan_ahead);
+                current_opcode.get_memory_addr_accessed(&self.cpu, pc_addr_scan_ahead);
 
             let symbol = self
                 .debugger
@@ -233,9 +237,23 @@ impl Nes {
         self.step_out_mode = true;
     }
 
+    fn emulator_stop(&mut self) {
+        self.step_out_mode = false;
+        self.step_next_count = 0;
+        self.running = false;
+    }
+
     fn emulator_execution_loop(&mut self) {
         self.ran_instruction = false;
-        while self.step_out_mode || self.step_next_count > 0 {
+        let start_time = std::time::Instant::now();
+        let frame_duration = std::time::Duration::from_millis(16); // 16.6ms for 60Hz, using 16ms for safety
+
+        while self.step_out_mode || self.step_next_count > 0 || self.running {
+            // Check if we've exceeded frame time
+            if start_time.elapsed() >= frame_duration {
+                break;
+            }
+
             self.step_next_count -= 1;
 
             self.previous_pc = self.cpu.pc;
@@ -252,25 +270,24 @@ impl Nes {
             // Debugger control flow section
             if self.debugger.hit_breakpoint_pc(self.cpu.pc) {
                 // hit breakpoint, stop.
-                self.step_next_count = 0;
+                self.emulator_stop();
                 break;
             }
             let optcode = self.cpu.get_optcode(self.cpu.pc);
-            let memory_accessed_u16 = optcode.get_memory_addr_accessed_u16(&self.cpu, self.cpu.pc);
+            let memory_accessed_u16 = optcode.get_memory_addr_accessed(&self.cpu, self.cpu.pc);
             if memory_accessed_u16.is_some()
                 && self.debugger.hit_breakpoint_memory_access(
                     memory_accessed_u16.expect("We check is_some() how is this possible?"),
                 )
             {
                 // hit breakpoint, stop.
-                self.step_next_count = 0;
+                self.emulator_stop();
                 break;
             }
 
             if self.step_out_mode && self.cpu.get_optcode(self.previous_pc).is_rts() {
                 // hit RTS in step out mode, stop.
-                self.step_out_mode = false;
-                self.step_next_count = 0;
+                self.emulator_stop();
                 break;
             }
         }
@@ -279,11 +296,17 @@ impl Nes {
 
 impl App for Nes {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        let start_time = std::time::Instant::now();
         self.emulator_execution_loop();
-        thread::sleep(time::Duration::from_millis(20)); // 50 fps
+        let elapsed_time: time::Duration = start_time.elapsed();
+        if (elapsed_time < std::time::Duration::from_millis(16)) {
+            // Refresh the UI at 60fps
+            thread::sleep(std::time::Duration::from_millis(16) - elapsed_time);
+        }
+
         ctx.request_repaint();
 
-        if self.ran_instruction {
+        if self.ran_instruction && !self.running {
             // SUPER SUPER EXPENSIVE, this scans the entire memory map
             self.memory_dump = self.generate_memory_dump();
         }
@@ -315,10 +338,10 @@ impl App for Nes {
                     self.ui_action_step_out()
                 }
                 if ui.button("Run").clicked() {
-                    self.step_next_count = u32::MAX;
+                    self.running = true;
                 }
                 if ui.button("Pause").clicked() {
-                    self.step_next_count = 0
+                    self.emulator_stop();
                 }
                 if ui.button("Reset").clicked() {
                     self.cpu.reset();

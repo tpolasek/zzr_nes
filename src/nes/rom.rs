@@ -12,7 +12,7 @@ const MAX_CHR_BANK_COUNT: u8 = 16; // 512KB
 const MAX_PRG_BANK_SIZE: u32 = PRG_BANK_BANK_SIZE * (MAX_PRG_BANK_COUNT as u32);
 const MAX_CHR_BANK_SIZE: u32 = CHR_BANK_BANK_SIZE * (MAX_CHR_BANK_COUNT as u32);
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Mirroring {
     HORIZONTAL,
     VERTICAL,
