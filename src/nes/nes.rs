@@ -360,10 +360,7 @@ impl App for Nes {
             .default_width(250.0)
             .show(ctx, |ui| {
                 if let Some(tex) = &self.image {
-                    ui.add(
-                        egui::Image::from_texture(tex)
-                            .fit_to_exact_size(egui::vec2(ui.available_width(), 150.0)),
-                    );
+                    ui.add(egui::Image::from_texture(tex));
                 }
                 ui.add_space(8.0);
 
