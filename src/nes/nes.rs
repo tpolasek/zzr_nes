@@ -31,6 +31,11 @@ pub struct Nes {
     ran_instruction: bool,
     show_breakpoint_window: bool,
     breakpoint_addr_input: String,
+    show_ppu_debug_window: bool,
+    selected_pattern_palette: u8,
+    pattern_table_0_texture: Option<TextureHandle>,
+    pattern_table_1_texture: Option<TextureHandle>,
+    nametable_texture: Option<TextureHandle>,
 }
 
 impl Nes {
@@ -61,6 +66,11 @@ impl Nes {
             ran_instruction: false,
             show_breakpoint_window: false,
             breakpoint_addr_input: String::new(),
+            show_ppu_debug_window: false,
+            selected_pattern_palette: 0,
+            pattern_table_0_texture: None,
+            pattern_table_1_texture: None,
+            nametable_texture: None,
         }
     }
 
@@ -243,6 +253,284 @@ impl Nes {
         self.running = false;
     }
 
+    fn nes_color_to_rgb(nes_color: u8) -> Color32 {
+        let color_u32 = crate::nes::ppu::PALETTE_LOOKUP[(nes_color & 0x3F) as usize];
+        Color32::from_rgb(
+            ((color_u32 >> 16) & 0xFF) as u8,
+            ((color_u32 >> 8) & 0xFF) as u8,
+            (color_u32 & 0xFF) as u8,
+        )
+    }
+
+    fn decode_tile_row(rom: &crate::nes::rom::Rom, tile_id: u8, row: u8, pattern_table_base: u16) -> [u8; 8] {
+        let tile_addr = pattern_table_base + ((tile_id as u16) << 4) + (row as u16);
+        let low_byte = rom.read_chr(tile_addr);
+        let high_byte = rom.read_chr(tile_addr + 8);
+
+        let mut pixels = [0u8; 8];
+        for bit in 0..8 {
+            let mask = 0x80 >> bit;
+            let low_bit = if low_byte & mask != 0 { 1 } else { 0 };
+            let high_bit = if high_byte & mask != 0 { 2 } else { 0 };
+            pixels[bit] = low_bit | high_bit;
+        }
+        pixels
+    }
+
+    fn get_palette_color(ppu: &crate::nes::ppu::Ppu, palette_index: u8, pixel_value: u8) -> Color32 {
+        if pixel_value == 0 {
+            let nes_color = ppu.palette_ram[0];
+            return Self::nes_color_to_rgb(nes_color);
+        }
+
+        let palette_addr = if palette_index < 4 {
+            (palette_index * 4 + pixel_value) as usize
+        } else {
+            (0x10 + (palette_index - 4) * 4 + pixel_value) as usize
+        };
+
+        let nes_color = ppu.palette_ram[palette_addr & 0x1F];
+        Self::nes_color_to_rgb(nes_color)
+    }
+
+    fn render_pattern_table(&self, table_index: u8, palette_index: u8) -> egui::ColorImage {
+        let pattern_table_base = if table_index == 0 { 0x0000 } else { 0x1000 };
+        let size = [128, 128];
+        let mut image = egui::ColorImage::new(size, Color32::BLACK);
+
+        for tile_y in 0..16 {
+            for tile_x in 0..16 {
+                let tile_id = (tile_y * 16 + tile_x) as u8;
+
+                for row in 0..8 {
+                    let pixels = Self::decode_tile_row(&self.cpu.bus.rom, tile_id, row, pattern_table_base);
+
+                    for col in 0..8 {
+                        let pixel_value = pixels[col];
+                        let color = Self::get_palette_color(&self.cpu.bus.ppu, palette_index, pixel_value);
+
+                        let x = tile_x * 8 + col;
+                        let y = tile_y * 8 + row as usize;
+                        let offset = y * 128 + x;
+
+                        image.pixels[offset] = color;
+                    }
+                }
+            }
+        }
+
+        image
+    }
+
+    fn render_nametable(&self) -> egui::ColorImage {
+        let size = [256, 240];
+        let mut image = egui::ColorImage::new(size, Color32::BLACK);
+
+        let ctrl = self.cpu.bus.ppu.cpuReadImmutable(&self.cpu.bus.rom, 0);
+        let nametable_base = 0x2000u16 + (((ctrl & 0x03) as u16) << 10);
+        let bg_pattern_table = if ctrl & 0x10 != 0 { 0x1000 } else { 0x0000 };
+
+        for tile_y in 0..30 {
+            for tile_x in 0..32 {
+                let nametable_addr = nametable_base + (tile_y * 32 + tile_x);
+                let tile_id = self.cpu.bus.ppu.read_ppu_memory(&self.cpu.bus.rom, nametable_addr);
+
+                // Get attribute palette
+                let attr_addr = nametable_base + 0x3C0 + (tile_y / 4) * 8 + (tile_x / 4);
+                let attr_byte = self.cpu.bus.ppu.read_ppu_memory(&self.cpu.bus.rom, attr_addr);
+                let shift = ((tile_y % 4) / 2) * 4 + ((tile_x % 4) / 2) * 2;
+                let palette_index = (attr_byte >> shift) & 0x03;
+
+                for row in 0..8 {
+                    let pixels = Self::decode_tile_row(&self.cpu.bus.rom, tile_id, row, bg_pattern_table);
+
+                    for col in 0..8 {
+                        let pixel_value = pixels[col];
+                        let color = Self::get_palette_color(&self.cpu.bus.ppu, palette_index, pixel_value);
+
+                        let x = tile_x as usize * 8 + col;
+                        let y = tile_y as usize * 8 + row as usize;
+                        let offset = y * 256 + x;
+
+                        image.pixels[offset] = color;
+                    }
+                }
+            }
+        }
+
+        image
+    }
+
+    fn render_ppu_debug_window(&mut self, ctx: &egui::Context) {
+        egui::Window::new("PPU Debug")
+            .collapsible(true)
+            .resizable(true)
+            .default_width(700.0)
+            .default_height(800.0)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    // Pattern Tables Section
+                    ui.heading("Pattern Tables");
+                    ui.separator();
+
+                    // Palette selector
+                    ui.horizontal(|ui| {
+                        ui.label("Palette:");
+                        for i in 0..8 {
+                            if ui.selectable_label(self.selected_pattern_palette == i, format!("{}", i)).clicked() {
+                                self.selected_pattern_palette = i;
+                            }
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.label("Pattern Table 0");
+                            if let Some(tex) = &self.pattern_table_0_texture {
+                                ui.add(egui::Image::from_texture(tex).fit_to_exact_size(egui::vec2(256.0, 256.0)));
+                            }
+                        });
+
+                        ui.vertical(|ui| {
+                            ui.label("Pattern Table 1");
+                            if let Some(tex) = &self.pattern_table_1_texture {
+                                ui.add(egui::Image::from_texture(tex).fit_to_exact_size(egui::vec2(256.0, 256.0)));
+                            }
+                        });
+                    });
+
+                    ui.add_space(10.0);
+
+                    // OAM Sprites
+                    ui.heading("OAM Sprites");
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .max_height(200.0)
+                        .show(ui, |ui| {
+                            ui.set_min_width(ui.available_width());
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("#   Y  X  Tile Pal Pri H V").monospace());
+                            });
+
+                            for i in 0..64 {
+                                let oam_offset = i * 4;
+                                let y = self.cpu.bus.ppu.oam_ram[oam_offset];
+                                let tile = self.cpu.bus.ppu.oam_ram[oam_offset + 1];
+                                let attr = self.cpu.bus.ppu.oam_ram[oam_offset + 2];
+                                let x = self.cpu.bus.ppu.oam_ram[oam_offset + 3];
+
+                                let palette = (attr & 0x03) + 4;
+                                let priority = if attr & 0x20 != 0 { "BG" } else { "FG" };
+                                let flip_h = if attr & 0x40 != 0 { "Y" } else { "N" };
+                                let flip_v = if attr & 0x80 != 0 { "Y" } else { "N" };
+
+                                ui.label(RichText::new(format!(
+                                    "{:02} {:02X} {:02X} {:02X}  {}  {}  {} {}",
+                                    i, y, x, tile, palette, priority, flip_h, flip_v
+                                )).monospace());
+                            }
+                        });
+
+                    ui.add_space(10.0);
+
+                    // PPU Registers and Internal State
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.heading("PPU Registers");
+                            ui.separator();
+
+                            let ctrl = self.cpu.bus.ppu.cpuReadImmutable(&self.cpu.bus.rom, 0);
+                            let mask = self.cpu.bus.ppu.cpuReadImmutable(&self.cpu.bus.rom, 1);
+                            let status = self.cpu.bus.ppu.cpuReadImmutable(&self.cpu.bus.rom, 2);
+
+                            ui.label(RichText::new(format!("PPUCTRL: ${:02X}", ctrl)).monospace());
+                            ui.label(RichText::new(format!("  NMI: {}", if ctrl & 0x80 != 0 { "ON" } else { "OFF" })).monospace());
+                            ui.label(RichText::new(format!("  Sprite size: {}", if ctrl & 0x20 != 0 { "8x16" } else { "8x8" })).monospace());
+                            ui.label(RichText::new(format!("  BG table: ${:04X}", if ctrl & 0x10 != 0 { 0x1000 } else { 0x0000 })).monospace());
+                            ui.label(RichText::new(format!("  Sprite table: ${:04X}", if ctrl & 0x08 != 0 { 0x1000 } else { 0x0000 })).monospace());
+
+                            ui.add_space(4.0);
+                            ui.label(RichText::new(format!("PPUMASK: ${:02X}", mask)).monospace());
+                            ui.label(RichText::new(format!("  Show BG: {}", if mask & 0x08 != 0 { "ON" } else { "OFF" })).monospace());
+                            ui.label(RichText::new(format!("  Show Sprites: {}", if mask & 0x10 != 0 { "ON" } else { "OFF" })).monospace());
+
+                            ui.add_space(4.0);
+                            ui.label(RichText::new(format!("PPUSTATUS: ${:02X}", status)).monospace());
+                            ui.label(RichText::new(format!("  VBlank: {}", if status & 0x80 != 0 { "YES" } else { "NO" })).monospace());
+                            ui.label(RichText::new(format!("  Sprite 0 hit: {}", if status & 0x40 != 0 { "YES" } else { "NO" })).monospace());
+                            ui.label(RichText::new(format!("  Sprite overflow: {}", if status & 0x20 != 0 { "YES" } else { "NO" })).monospace());
+                        });
+
+                        ui.separator();
+
+                        ui.vertical(|ui| {
+                            ui.heading("Internal State");
+                            ui.separator();
+                            ui.label(RichText::new(format!("Scanline: {}", self.cpu.bus.ppu.scanline)).monospace());
+                            ui.label(RichText::new(format!("Pixel: {}", self.cpu.bus.ppu.pixel)).monospace());
+                            ui.label(RichText::new(format!("v: ${:04X}", self.cpu.bus.ppu.v)).monospace());
+                            ui.label(RichText::new(format!("t: ${:04X}", self.cpu.bus.ppu.t)).monospace());
+                            ui.label(RichText::new(format!("x: ${:02X}", self.cpu.bus.ppu.x)).monospace());
+                            ui.label(RichText::new(format!("w: {}", if self.cpu.bus.ppu.w { "2nd" } else { "1st" })).monospace());
+                        });
+                    });
+
+                    ui.add_space(10.0);
+
+                    // Palette RAM
+                    ui.heading("Palette RAM");
+                    ui.separator();
+                    ui.label("Background Palettes:");
+                    for pal in 0..4 {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{}:", pal));
+                            for col in 0..4 {
+                                let addr = pal * 4 + col;
+                                let nes_color = self.cpu.bus.ppu.palette_ram[addr];
+                                let rgb_color = Self::nes_color_to_rgb(nes_color);
+
+                                let (rect, _response) = ui.allocate_exact_size(
+                                    egui::vec2(16.0, 16.0),
+                                    egui::Sense::hover()
+                                );
+                                ui.painter().rect_filled(rect, 0.0, rgb_color);
+                                ui.label(RichText::new(format!("${:02X}", nes_color)).monospace().small());
+                            }
+                        });
+                    }
+
+                    ui.add_space(4.0);
+                    ui.label("Sprite Palettes:");
+                    for pal in 0..4 {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{}:", pal + 4));
+                            for col in 0..4 {
+                                let addr = 0x10 + pal * 4 + col;
+                                let nes_color = self.cpu.bus.ppu.palette_ram[addr & 0x1F];
+                                let rgb_color = Self::nes_color_to_rgb(nes_color);
+
+                                let (rect, _response) = ui.allocate_exact_size(
+                                    egui::vec2(16.0, 16.0),
+                                    egui::Sense::hover()
+                                );
+                                ui.painter().rect_filled(rect, 0.0, rgb_color);
+                                ui.label(RichText::new(format!("${:02X}", nes_color)).monospace().small());
+                            }
+                        });
+                    }
+
+                    ui.add_space(10.0);
+
+                    // Nametable Preview
+                    ui.heading("Nametable Preview");
+                    ui.separator();
+                    if let Some(tex) = &self.nametable_texture {
+                        ui.add(egui::Image::from_texture(tex).fit_to_exact_size(egui::vec2(512.0, 480.0)));
+                    }
+                });
+            });
+    }
+
     fn emulator_execution_loop(&mut self) {
         self.ran_instruction = false;
         let start_time = std::time::Instant::now();
@@ -326,6 +614,30 @@ impl App for Nes {
             egui::TextureOptions::default(),
         ));
 
+        // Regenerate PPU debug images if window is open and instruction ran
+        if self.show_ppu_debug_window && self.ran_instruction {
+            let pt0_image = self.render_pattern_table(0, self.selected_pattern_palette);
+            self.pattern_table_0_texture = Some(ctx.load_texture(
+                "pattern_table_0",
+                pt0_image,
+                egui::TextureOptions::NEAREST
+            ));
+
+            let pt1_image = self.render_pattern_table(1, self.selected_pattern_palette);
+            self.pattern_table_1_texture = Some(ctx.load_texture(
+                "pattern_table_1",
+                pt1_image,
+                egui::TextureOptions::NEAREST
+            ));
+
+            let nt_image = self.render_nametable();
+            self.nametable_texture = Some(ctx.load_texture(
+                "nametable",
+                nt_image,
+                egui::TextureOptions::NEAREST
+            ));
+        }
+
         egui::TopBottomPanel::top("top").show(ctx, |ui: &mut egui::Ui| {
             ui.horizontal(|ui: &mut egui::Ui| {
                 if ui.button("Step").clicked() {
@@ -349,6 +661,9 @@ impl App for Nes {
                     self.step_next_count = 0;
                     self.step_out_mode = false;
                 }
+                if ui.button("PPU").clicked() {
+                    self.show_ppu_debug_window = !self.show_ppu_debug_window;
+                }
                 if ui.button("Breakpoint").clicked() {
                     self.show_breakpoint_window = !self.show_breakpoint_window;
                 }
@@ -359,6 +674,7 @@ impl App for Nes {
         egui::SidePanel::right("sidebar")
             .default_width(250.0)
             .show(ctx, |ui| {
+                // Game Rendering Screen is here:
                 if let Some(tex) = &self.image {
                     ui.add(egui::Image::from_texture(tex));
                 }
@@ -503,6 +819,11 @@ impl App for Nes {
                         self.show_breakpoint_window = false;
                     }
                 });
+        }
+
+        // PPU Debug Window
+        if self.show_ppu_debug_window {
+            self.render_ppu_debug_window(ctx);
         }
     }
 }

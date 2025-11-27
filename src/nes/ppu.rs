@@ -2,7 +2,7 @@ use crate::nes::rom::{Mirroring, Rom};
 use egui::{Color32, ColorImage};
 
 #[allow(dead_code)]
-static PALETTE_LOOKUP: [u32; 64] = [
+pub static PALETTE_LOOKUP: [u32; 64] = [
     0x545454, 0x001E74, 0x081090, 0x300088, 0x440064, 0x5C0030, 0x540400, 0x3C1800, 0x202A00,
     0x083A00, 0x004000, 0x003C00, 0x00323C, 0x000000, 0x000000, 0x000000, 0x989698, 0x084CC4,
     0x3032EC, 0x5C1EE4, 0x8814B0, 0xA01464, 0x982220, 0x783C00, 0x545A00, 0x287200, 0x087C00,
@@ -31,10 +31,10 @@ pub struct Ppu {
     nmi_triggered: bool,
 
     // Loopy registers (PPU internal addressing)
-    v: u16,              // Current VRAM address (15 bits)
-    t: u16,              // Temporary VRAM address (15 bits)
-    x: u8,               // Fine X scroll (3 bits)
-    w: bool,             // First/second write toggle
+    pub v: u16,              // Current VRAM address (15 bits)
+    pub t: u16,              // Temporary VRAM address (15 bits)
+    pub x: u8,               // Fine X scroll (3 bits)
+    pub w: bool,             // First/second write toggle
 
     // Background rendering shift registers
     bg_pattern_shift_low: u16,    // Pattern table low bits
@@ -70,7 +70,7 @@ pub struct Ppu {
     // pattern table usually maps to rom CHR
     vram_bank_1: [u8; 0x400], //  Nametable Ram only 2k (room for 2 nametables mirrored, some roms have onboard memory for 4 tables)
     vram_bank_2: [u8; 0x400],
-    palette_ram: [u8; 0x20],
+    pub palette_ram: [u8; 0x20],
     pub oam_ram: [u8; 0x100],  // 256 bytes for 64 sprites (4 bytes each)
 }
 
@@ -172,6 +172,11 @@ impl Ppu {
                 panic!("We should never get here in the PPU addr={}", register_num);
             }
         }
+    }
+
+    /// Public wrapper for PPU memory reads (for debugger/visualization)
+    pub fn read_ppu_memory(&self, rom: &Rom, address: u16) -> u8 {
+        self.ppuRead(rom, address)
     }
 
     /// Start Read Register
