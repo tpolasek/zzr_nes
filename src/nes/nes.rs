@@ -299,7 +299,7 @@ impl App for Nes {
         let start_time = std::time::Instant::now();
         self.emulator_execution_loop();
         let elapsed_time: time::Duration = start_time.elapsed();
-        if (elapsed_time < std::time::Duration::from_millis(16)) {
+        if elapsed_time < std::time::Duration::from_millis(16) {
             // Refresh the UI at 60fps
             thread::sleep(std::time::Duration::from_millis(16) - elapsed_time);
         }
