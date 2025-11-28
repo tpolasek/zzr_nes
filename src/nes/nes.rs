@@ -735,7 +735,7 @@ impl App for Nes {
         self.image = Some(ctx.load_texture(
             "ppu_preview",
             self.cpu.bus.ppu.gbuffer.clone(), // TODO look into replacing this clone with arc?
-            egui::TextureOptions::default(),
+            egui::TextureOptions::NEAREST,
         ));
 
         // Regenerate PPU debug images if window is open and instruction ran
@@ -786,41 +786,39 @@ impl App for Nes {
         });
 
         // Side panel first - spans full vertical space between top and bottom of window
-        egui::SidePanel::right("sidebar")
-            .default_width(250.0)
-            .show(ctx, |ui| {
-                // Game Rendering Screen is here:
-                if let Some(tex) = &self.image {
-                    ui.add(egui::Image::from_texture(tex));
+        egui::SidePanel::right("sidebar").show(ctx, |ui| {
+            // Game Rendering Screen is here:
+            if let Some(tex) = &self.image {
+                ui.add(egui::Image::from_texture(tex).fit_to_exact_size(egui::vec2(512.0, 480.0)));
+            }
+            ui.add_space(8.0);
+
+            ui.heading("Registers");
+            ui.separator();
+            ui.heading(RichText::new(format!(" A={:02X}", self.cpu.reg_a)));
+            ui.heading(RichText::new(format!(" X={:02X}", self.cpu.reg_x)));
+            ui.heading(RichText::new(format!(" Y={:02X}", self.cpu.reg_y)));
+            ui.heading(RichText::new(format!("SP={:02X}", self.cpu.reg_sp)));
+            ui.heading(RichText::new(format!("PC={:04x}", self.cpu.pc)));
+            ui.heading(RichText::new(format!(
+                "{}",
+                self.cpu.flag.get_formatted_str()
+            )));
+
+            ui.add_space(8.0);
+            ui.heading("CPU Info");
+            ui.separator();
+            ui.heading(format!("Cycle: {}", self.cpu.tick_count as usize));
+            ui.add_space(8.0);
+            ui.heading("CPU Stack ($0100-$01FF)");
+            ui.separator();
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                for stack_item in &self.stack_data {
+                    ui.heading(stack_item);
                 }
-                ui.add_space(8.0);
-
-                ui.heading("Registers");
-                ui.separator();
-                ui.heading(RichText::new(format!(" A={:02X}", self.cpu.reg_a)));
-                ui.heading(RichText::new(format!(" X={:02X}", self.cpu.reg_x)));
-                ui.heading(RichText::new(format!(" Y={:02X}", self.cpu.reg_y)));
-                ui.heading(RichText::new(format!("SP={:02X}", self.cpu.reg_sp)));
-                ui.heading(RichText::new(format!("PC={:04x}", self.cpu.pc)));
-                ui.heading(RichText::new(format!(
-                    "{}",
-                    self.cpu.flag.get_formatted_str()
-                )));
-
-                ui.add_space(8.0);
-                ui.heading("CPU Info");
-                ui.separator();
-                ui.heading(format!("Cycle: {}", self.cpu.tick_count as usize));
-                ui.add_space(8.0);
-                ui.heading("CPU Stack ($0100-$01FF)");
-                ui.separator();
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.set_min_width(ui.available_width());
-                    for stack_item in &self.stack_data {
-                        ui.heading(stack_item);
-                    }
-                });
             });
+        });
 
         // Central panel - takes remaining space after sidebar
         egui::CentralPanel::default().show(ctx, |ui: &mut egui::Ui| {
@@ -831,7 +829,7 @@ impl App for Nes {
                 ui.separator();
 
                 egui::ScrollArea::vertical()
-                    .max_height(400.0) // Set a max height for disassembly section
+                    .max_height(600.0) // Set a max height for disassembly section
                     .show(ui, |ui| {
                         ui.set_min_width(ui.available_width());
                         for (_, ins) in self.disasm.iter_mut().enumerate() {
@@ -879,16 +877,14 @@ impl App for Nes {
                 ui.heading("Memory Hex Dump");
                 ui.separator();
 
-                egui::ScrollArea::vertical()
-                    .max_height(300.0) // Set a max height for memory section
-                    .show(ui, |ui| {
-                        ui.set_min_width(ui.available_width());
-                        ui.add(
-                            egui::TextEdit::multiline(&mut self.memory_dump.as_str())
-                                .desired_width(ui.available_width())
-                                .font(egui::TextStyle::Small),
-                        );
-                    });
+                egui::ScrollArea::vertical().show(ui, |ui: &mut egui::Ui| {
+                    ui.set_min_width(ui.available_width());
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.memory_dump.as_str())
+                            .desired_width(ui.available_width())
+                            .font(egui::TextStyle::Small),
+                    );
+                });
             });
         });
 

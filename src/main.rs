@@ -11,7 +11,7 @@ use eframe::NativeOptions;
 fn main() {
     let opts: NativeOptions = NativeOptions {
         // Configure the viewport (main window) settings
-        viewport: egui::ViewportBuilder::default().with_inner_size([850.0, 768.0]), // Set width and height here
+        viewport: egui::ViewportBuilder::default().with_inner_size([1100.0, 1000.0]), // Set width and height here
         ..Default::default()
     };
     //let filename = &String::from("/Users/thomas/code/nes_tests/nmi_interrupt/build/build.nes");
