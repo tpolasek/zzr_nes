@@ -14,6 +14,7 @@ fn main() {
         viewport: egui::ViewportBuilder::default().with_inner_size([850.0, 768.0]), // Set width and height here
         ..Default::default()
     };
+    //let filename = &String::from("/Users/thomas/code/nes_tests/nmi_interrupt/build/build.nes");
     let filename = &String::from("/Users/thomas/Downloads/donkeykong.nes");
     let debug_file = &String::from("/Users/thomas/code/nes_tests/nmi_interrupt/build/build.dbg");
     let filename_owned = filename.clone();
