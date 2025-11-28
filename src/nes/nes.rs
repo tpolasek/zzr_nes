@@ -1,10 +1,11 @@
 use eframe::{App, Frame, egui};
-use egui::{Color32, FontFamily, FontId, RichText, Style, TextStyle, TextureHandle, Visuals};
+use egui::*;
 use std::{thread, time};
 /*
-This file contains the GUI implementation and it is also where we execute the emulator.
+This file contains the GUI Debugger implementation and it is also where we execute the emulator.
 */
 
+use crate::nes::controller::Button;
 use crate::nes::cpu::Cpu;
 use crate::nes::cpu::Opcode;
 use crate::nes::debugger::Debugger;
@@ -23,6 +24,7 @@ pub struct Nes {
     running: bool,
     step_next_count: u32,
     step_out_mode: bool,
+    step_frame: bool,
     memory_dump: String,
     disasm: Vec<GUIInstruction>,
     stack_data: Vec<String>,
@@ -58,6 +60,7 @@ impl Nes {
             running: false,
             step_next_count,
             step_out_mode: false,
+            step_frame: false,
             memory_dump: "".to_string(),
             disasm,
             stack_data,
@@ -246,8 +249,13 @@ impl Nes {
     fn ui_action_step_out(&mut self) {
         self.step_out_mode = true;
     }
+    fn ui_action_step_frame(&mut self) {
+        self.step_frame = true;
+    }
 
     fn emulator_stop(&mut self) {
+        // TODO put all of these run modes into a Class
+        self.step_frame = false;
         self.step_out_mode = false;
         self.step_next_count = 0;
         self.running = false;
@@ -656,13 +664,72 @@ impl Nes {
             });
     }
 
+    fn handle_keyboard_input(&mut self, ctx: &egui::Context) {
+        ctx.input(|input_state| {
+            for event in &input_state.events {
+                match event {
+                    Event::Key {
+                        key,
+                        pressed,
+                        modifiers,
+                        repeat,
+                    } => {
+                        if *pressed {
+                            if *key == Key::ArrowUp {
+                                self.cpu.bus.controller.pressed(Button::UP);
+                            } else if *key == Key::ArrowDown {
+                                self.cpu.bus.controller.pressed(Button::DOWN);
+                            } else if *key == Key::ArrowLeft {
+                                self.cpu.bus.controller.pressed(Button::LEFT);
+                            } else if *key == Key::ArrowRight {
+                                self.cpu.bus.controller.pressed(Button::RIGHT);
+                            } else if *key == Key::Z {
+                                self.cpu.bus.controller.pressed(Button::A);
+                            } else if *key == Key::X {
+                                self.cpu.bus.controller.pressed(Button::B);
+                            } else if *key == Key::Enter {
+                                self.cpu.bus.controller.pressed(Button::START);
+                            } else if *key == Key::Backspace {
+                                self.cpu.bus.controller.pressed(Button::SELECT);
+                            }
+                        } else {
+                            // Released
+                            if *key == Key::ArrowUp {
+                                self.cpu.bus.controller.released(Button::UP);
+                            } else if *key == Key::ArrowDown {
+                                self.cpu.bus.controller.released(Button::DOWN);
+                            } else if *key == Key::ArrowLeft {
+                                self.cpu.bus.controller.released(Button::LEFT);
+                            } else if *key == Key::ArrowRight {
+                                self.cpu.bus.controller.released(Button::RIGHT);
+                            } else if *key == Key::Z {
+                                self.cpu.bus.controller.released(Button::A);
+                            } else if *key == Key::X {
+                                self.cpu.bus.controller.released(Button::B);
+                            } else if *key == Key::Enter {
+                                self.cpu.bus.controller.released(Button::START);
+                            } else if *key == Key::Backspace {
+                                self.cpu.bus.controller.released(Button::SELECT);
+                            }
+                        }
+                    }
+
+                    _ => {} // Handle other event types if needed
+                }
+            }
+        });
+    }
+
     fn emulator_execution_loop(&mut self) {
         self.ran_instruction = false;
         let start_frame_count = self.cpu.bus.ppu.frame_counter;
 
-        while self.step_out_mode || self.step_next_count > 0 || self.running {
+        while self.step_out_mode || self.step_next_count > 0 || self.running || self.step_frame {
             // Check if we've exceeded frame time
             if self.cpu.bus.ppu.frame_counter > start_frame_count {
+                if (self.step_frame) {
+                    self.emulator_stop();
+                }
                 break;
             }
 
@@ -710,6 +777,8 @@ impl App for Nes {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
         let start_time = std::time::Instant::now();
         self.emulator_execution_loop();
+        self.handle_keyboard_input(&ctx);
+
         let elapsed_time: time::Duration = start_time.elapsed();
         if elapsed_time < std::time::Duration::from_millis(16) {
             // Refresh the UI at 60fps
@@ -718,17 +787,25 @@ impl App for Nes {
 
         ctx.request_repaint();
 
+        // PPU Debug Window
+        if self.show_ppu_debug_window {
+            self.render_ppu_debug_window(ctx);
+        }
+
         if self.ran_instruction && !self.running {
             // SUPER SUPER EXPENSIVE, this scans the entire memory map
             self.memory_dump = self.generate_memory_dump();
         }
+
         self.generate_opcode_diassembly();
         self.populate_stack_data();
 
-        // Start Keyboard Hooks
+        // Start Keyboard Debug Hooks
+        /*
         if ctx.input(|i| i.key_pressed(egui::Key::S)) {
             self.ui_action_step()
         }
+        */
         // End Keyboard Hooks
 
         // Render image
@@ -763,6 +840,9 @@ impl App for Nes {
                 }
                 if ui.button("Step Out").clicked() {
                     self.ui_action_step_out()
+                }
+                if ui.button("Step Frame").clicked() {
+                    self.ui_action_step_frame()
                 }
                 if ui.button("Run").clicked() {
                     self.running = true;
@@ -931,20 +1011,5 @@ impl App for Nes {
                     }
                 });
         }
-
-        // PPU Debug Window
-        if self.show_ppu_debug_window {
-            self.render_ppu_debug_window(ctx);
-        }
     }
 }
-
-/*
-Support Key Presses
-Key::W => self.cpu.bus.controller.pressed(Button::UP),
-Key::A => self.cpu.bus.controller.pressed(Button::LEFT),
-Key::S => self.cpu.bus.controller.pressed(Button::DOWN),
-Key::D => self.cpu.bus.controller.pressed(Button::RIGHT),
-Key::K => self.cpu.bus.controller.pressed(Button::A),
-Key::L => self.cpu.bus.controller.pressed(Button::B),
-*/
