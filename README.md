@@ -1,4 +1,6 @@
 # ZNES - NES Emulator written in rust.
+<img width="848" height="806" alt="image" src="https://github.com/user-attachments/assets/735161bf-3fed-4f41-a26b-cf1b16de2926" />
+
 
 # Key planned features include:
 - Cycle accurate PPU and CPU emulation
