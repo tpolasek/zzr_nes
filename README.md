@@ -1,5 +1,5 @@
 # ZNES - NES Emulator written in rust.
-<img width="848" height="806" alt="image" src="https://github.com/user-attachments/assets/735161bf-3fed-4f41-a26b-cf1b16de2926" />
+<img width="1101" height="1027" alt="image" src="https://github.com/user-attachments/assets/a94bfa56-c7d9-4358-aa76-5dc12c2c8f97" />
 
 
 # Key planned features include:
