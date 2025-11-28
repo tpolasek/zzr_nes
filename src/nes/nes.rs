@@ -658,12 +658,11 @@ impl Nes {
 
     fn emulator_execution_loop(&mut self) {
         self.ran_instruction = false;
-        let start_time = std::time::Instant::now();
-        let frame_duration = std::time::Duration::from_millis(16); // 16.6ms for 60Hz, using 16ms for safety
+        let start_frame_count = self.cpu.bus.ppu.frame_counter;
 
         while self.step_out_mode || self.step_next_count > 0 || self.running {
             // Check if we've exceeded frame time
-            if start_time.elapsed() >= frame_duration {
+            if self.cpu.bus.ppu.frame_counter > start_frame_count {
                 break;
             }
 

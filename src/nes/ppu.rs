@@ -27,6 +27,7 @@ pub struct Ppu {
     data_buffer: u8,
     pub pixel: u16,
     pub scanline: u16,
+    pub frame_counter: u16,
     pub gbuffer: ColorImage,
     nmi_triggered: bool,
 
@@ -86,6 +87,7 @@ impl Ppu {
             data_buffer: 0,
             pixel: 0,
             scanline: 0,
+            frame_counter: 0,
             gbuffer: ColorImage::new([256usize, 240usize], Color32::BLACK),
             nmi_triggered: false,
             v: 0,
@@ -890,6 +892,7 @@ impl Ppu {
             self.scanline += 1;
             if self.scanline > 261 {
                 self.scanline = 0;
+                self.frame_counter += 1;
             }
         }
     }
