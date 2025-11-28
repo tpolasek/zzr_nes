@@ -335,7 +335,7 @@ impl Nes {
 
     fn render_nametable(&self) -> egui::ColorImage {
         let size = [256, 240];
-        let mut image = egui::ColorImage::new(size, Color32::BLACK);
+        let mut image: egui::ColorImage = egui::ColorImage::new(size, Color32::BLACK);
 
         let ctrl = self.cpu.bus.ppu.cpuReadImmutable(&self.cpu.bus.rom, 0);
         let nametable_base = 0x2000u16 + (((ctrl & 0x03) as u16) << 10);

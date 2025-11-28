@@ -31,22 +31,22 @@ pub struct Ppu {
     nmi_triggered: bool,
 
     // Loopy registers (PPU internal addressing)
-    pub v: u16,              // Current VRAM address (15 bits)
-    pub t: u16,              // Temporary VRAM address (15 bits)
-    pub x: u8,               // Fine X scroll (3 bits)
-    pub w: bool,             // First/second write toggle
+    pub v: u16,  // Current VRAM address (15 bits)
+    pub t: u16,  // Temporary VRAM address (15 bits)
+    pub x: u8,   // Fine X scroll (3 bits)
+    pub w: bool, // First/second write toggle
 
     // Background rendering shift registers
-    bg_pattern_shift_low: u16,    // Pattern table low bits
-    bg_pattern_shift_high: u16,   // Pattern table high bits
-    bg_palette_shift_low: u16,    // Palette attribute low bits
-    bg_palette_shift_high: u16,   // Palette attribute high bits
+    bg_pattern_shift_low: u16,  // Pattern table low bits
+    bg_pattern_shift_high: u16, // Pattern table high bits
+    bg_palette_shift_low: u16,  // Palette attribute low bits
+    bg_palette_shift_high: u16, // Palette attribute high bits
 
     // Background latches (for next tile)
     bg_next_tile_id: u8,
     bg_next_tile_attr: u8,
-    bg_next_tile_lsb: u8,  // Pattern low byte
-    bg_next_tile_msb: u8,  // Pattern high byte
+    bg_next_tile_lsb: u8, // Pattern low byte
+    bg_next_tile_msb: u8, // Pattern high byte
 
     // Sprite rendering (8 sprites per scanline)
     sprite_count: usize,
@@ -71,7 +71,7 @@ pub struct Ppu {
     vram_bank_1: [u8; 0x400], //  Nametable Ram only 2k (room for 2 nametables mirrored, some roms have onboard memory for 4 tables)
     vram_bank_2: [u8; 0x400],
     pub palette_ram: [u8; 0x20],
-    pub oam_ram: [u8; 0x100],  // 256 bytes for 64 sprites (4 bytes each)
+    pub oam_ram: [u8; 0x100], // 256 bytes for 64 sprites (4 bytes each)
 }
 
 impl Ppu {
@@ -298,7 +298,7 @@ impl Ppu {
     }
 
     fn read_PPUSTATUS(&mut self) -> u8 {
-        self.w = false;  // Reset write latch
+        self.w = false; // Reset write latch
 
         // last 5 bits are the last data bits written -- whack
         let output = (self.reg_status & 0xE0) | (self.data_buffer & 0x1F);
@@ -356,11 +356,19 @@ impl Ppu {
     }
 
     fn get_sprite_pattern_table(&self) -> u16 {
-        if self.reg_ctrl & 0x08 != 0 { 0x1000 } else { 0x0000 }
+        if self.reg_ctrl & 0x08 != 0 {
+            0x1000
+        } else {
+            0x0000
+        }
     }
 
     fn get_bg_pattern_table(&self) -> u16 {
-        if self.reg_ctrl & 0x10 != 0 { 0x1000 } else { 0x0000 }
+        if self.reg_ctrl & 0x10 != 0 {
+            0x1000
+        } else {
+            0x0000
+        }
     }
 
     fn get_sprite_size(&self) -> u8 {
@@ -458,8 +466,10 @@ impl Ppu {
 
     fn reload_shift_registers(&mut self) {
         // Load the next tile's pattern data into the shift registers
-        self.bg_pattern_shift_low = (self.bg_pattern_shift_low & 0xFF00) | (self.bg_next_tile_lsb as u16);
-        self.bg_pattern_shift_high = (self.bg_pattern_shift_high & 0xFF00) | (self.bg_next_tile_msb as u16);
+        self.bg_pattern_shift_low =
+            (self.bg_pattern_shift_low & 0xFF00) | (self.bg_next_tile_lsb as u16);
+        self.bg_pattern_shift_high =
+            (self.bg_pattern_shift_high & 0xFF00) | (self.bg_next_tile_msb as u16);
 
         // Load palette bits (expand 2 bits to 8 bits based on attribute)
         let attr_bits = self.bg_next_tile_attr & 0x03;
@@ -477,9 +487,7 @@ impl Ppu {
     }
 
     fn fetch_attribute_byte(&self, rom: &Rom) -> u8 {
-        let addr = 0x23C0 | (self.v & 0x0C00) |
-                   ((self.v >> 4) & 0x38) |
-                   ((self.v >> 2) & 0x07);
+        let addr = 0x23C0 | (self.v & 0x0C00) | ((self.v >> 4) & 0x38) | ((self.v >> 2) & 0x07);
         let attribute = self.ppuRead(rom, addr);
 
         // Determine which 2x2 tile quadrant (4 quadrants per attribute byte)
@@ -530,7 +538,7 @@ impl Ppu {
 
     fn get_color_from_palette(&self, palette: u8, pixel: u8) -> u32 {
         let addr = if pixel == 0 {
-            0x3F00  // Universal background color
+            0x3F00 // Universal background color
         } else if palette < 4 {
             // Background palette
             0x3F00 + ((palette as u16) << 2) + (pixel as u16)
@@ -543,7 +551,11 @@ impl Ppu {
 
         // Handle palette mirroring
         let mirrored_addr = addr & 0x1F;
-        if mirrored_addr == 0x10 || mirrored_addr == 0x14 || mirrored_addr == 0x18 || mirrored_addr == 0x1C {
+        if mirrored_addr == 0x10
+            || mirrored_addr == 0x14
+            || mirrored_addr == 0x18
+            || mirrored_addr == 0x1C
+        {
             palette_index = self.palette_ram[(mirrored_addr & 0x0F) as usize];
         }
 
@@ -567,7 +579,11 @@ impl Ppu {
             let sprite_x = self.oam_ram[oam_offset + 3];
 
             // Check if sprite is on next scanline
-            let next_scanline = if self.scanline == 261 { 0 } else { self.scanline + 1 };
+            let next_scanline = if self.scanline == 261 {
+                0
+            } else {
+                self.scanline + 1
+            };
             let sprite_height = if self.get_sprite_size() == 16 { 16 } else { 8 };
             let diff = next_scanline.wrapping_sub(sprite_y);
 
@@ -645,7 +661,8 @@ impl Ppu {
                 if pixel != 0 {
                     let palette = (self.sprite_priorities[i] & 0x03) + 4;
                     let priority = (self.sprite_priorities[i] & 0x20) == 0;
-                    let sprite_zero = self.sprite_zero_being_rendered && self.sprite_indices[i] == 0;
+                    let sprite_zero =
+                        self.sprite_zero_being_rendered && self.sprite_indices[i] == 0;
 
                     return (pixel, palette, priority as u8, sprite_zero);
                 }
@@ -677,13 +694,13 @@ impl Ppu {
     fn write_PPUSCROLL(&mut self, value: u8) {
         if !self.w {
             // First write: X scroll
-            self.t = (self.t & 0xFFE0) | ((value as u16) >> 3);  // Coarse X
-            self.x = value & 0x07;  // Fine X
+            self.t = (self.t & 0xFFE0) | ((value as u16) >> 3); // Coarse X
+            self.x = value & 0x07; // Fine X
             self.w = true;
         } else {
             // Second write: Y scroll
-            self.t = (self.t & 0x8FFF) | (((value as u16) & 0x07) << 12);  // Fine Y
-            self.t = (self.t & 0xFC1F) | (((value as u16) & 0xF8) << 2);   // Coarse Y
+            self.t = (self.t & 0x8FFF) | (((value as u16) & 0x07) << 12); // Fine Y
+            self.t = (self.t & 0xFC1F) | (((value as u16) & 0xF8) << 2); // Coarse Y
             self.w = false;
         }
         self.data_buffer = value;
@@ -696,7 +713,7 @@ impl Ppu {
         } else {
             // Second write: low byte
             self.t = (self.t & 0xFF00) | (value as u16);
-            self.v = self.t;  // Copy t to v
+            self.v = self.t; // Copy t to v
             self.w = false;
         }
         self.data_buffer = value;
@@ -718,6 +735,18 @@ impl Ppu {
     }
 
     pub fn tick(&mut self, rom: &Rom) {
+        if self.scanline == 0 && self.pixel == 1 {
+            println!(
+                "Scanline 0 start: v={:04X}, t={:04X}, x={}, w={}, 
+  ctrl={:02X}, mask={:02X}",
+                self.v, self.t, self.x, self.w, self.reg_ctrl, self.reg_mask
+            );
+            println!(
+                "Shift regs: pattern_low={:04X}, pattern_high={:04X}",
+                self.bg_pattern_shift_low, self.bg_pattern_shift_high
+            );
+        }
+
         let rendering_enabled = self.is_rendering_enabled();
 
         // Visible scanlines (0-239)
@@ -740,10 +769,10 @@ impl Ppu {
                         // - Not at pixel 255 (hardware quirk)
 
                         let leftmost_ok = (self.show_background_left() && self.show_sprites_left())
-                                          || self.pixel >= 9;
+                            || self.pixel >= 9;
 
                         if leftmost_ok && self.pixel < 255 {
-                            self.reg_status |= 0x40;  // Set sprite 0 hit flag
+                            self.reg_status |= 0x40; // Set sprite 0 hit flag
                         }
                     }
 
@@ -772,17 +801,23 @@ impl Ppu {
                         (color & 0xFF) as u8,
                     ];
                     self.gbuffer.pixels[offset] = Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
-
-                    // Shift registers every cycle
-                    self.bg_pattern_shift_low <<= 1;
-                    self.bg_pattern_shift_high <<= 1;
-                    self.bg_palette_shift_low <<= 1;
-                    self.bg_palette_shift_high <<= 1;
                 }
             }
+        }
 
-            if rendering_enabled {
-                // Background tile fetching (8 cycles per tile)
+        // Shift registers and tile fetching (happens on visible AND pre-render scanlines)
+        if (self.scanline < 240 || self.scanline == 261) && rendering_enabled {
+            // Shift registers during visible pixels (1-256) and prefetch cycles (321-336)
+            if (self.pixel >= 1 && self.pixel <= 256) || (self.pixel >= 321 && self.pixel <= 336) {
+                self.bg_pattern_shift_low <<= 1;
+                self.bg_pattern_shift_high <<= 1;
+                self.bg_palette_shift_low <<= 1;
+                self.bg_palette_shift_high <<= 1;
+            }
+
+            // Background tile fetching (8 cycles per tile)
+            // Fetches happen during visible area (1-256) and prefetch (321-336)
+            if (self.pixel >= 1 && self.pixel <= 256) || (self.pixel >= 321 && self.pixel <= 336) {
                 match (self.pixel - 1) % 8 {
                     0 => {
                         self.reload_shift_registers();
@@ -793,25 +828,29 @@ impl Ppu {
                     }
                     4 => {
                         let fine_y = ((self.v >> 12) & 0x07) as u8;
-                        self.bg_next_tile_lsb = self.fetch_pattern_low(rom, self.bg_next_tile_id, fine_y);
+                        self.bg_next_tile_lsb =
+                            self.fetch_pattern_low(rom, self.bg_next_tile_id, fine_y);
                     }
                     6 => {
                         let fine_y = ((self.v >> 12) & 0x07) as u8;
-                        self.bg_next_tile_msb = self.fetch_pattern_high(rom, self.bg_next_tile_id, fine_y);
+                        self.bg_next_tile_msb =
+                            self.fetch_pattern_high(rom, self.bg_next_tile_id, fine_y);
                     }
                     7 => {
                         self.increment_scroll_x();
                     }
                     _ => {}
                 }
+            }
 
-                // End of visible scanline
-                if self.pixel == 256 {
-                    self.increment_scroll_y();
-                }
-                if self.pixel == 257 {
-                    self.transfer_address_x();
-                    // Sprite evaluation for next scanline
+            // End of visible scanline
+            if self.pixel == 256 {
+                self.increment_scroll_y();
+            }
+            if self.pixel == 257 {
+                self.transfer_address_x();
+                // Sprite evaluation for next scanline (only on visible scanlines)
+                if self.scanline < 240 {
                     self.evaluate_sprites(rom);
                 }
             }
@@ -821,8 +860,8 @@ impl Ppu {
         if self.scanline == 261 {
             if self.pixel == 1 {
                 self.reg_status &= !PPU_STATUS_VBLANK_BIT;
-                self.reg_status &= !0x40;  // Clear sprite 0 hit
-                self.reg_status &= !0x20;  // Clear sprite overflow
+                self.reg_status &= !0x40; // Clear sprite 0 hit
+                self.reg_status &= !0x20; // Clear sprite overflow
             }
 
             if rendering_enabled && self.pixel >= 280 && self.pixel <= 304 {
