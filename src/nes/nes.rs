@@ -386,7 +386,7 @@ impl Nes {
         egui::Window::new("PPU Debug")
             .collapsible(true)
             .resizable(true)
-            .default_width(700.0)
+            .max_width(700.0)
             .default_height(800.0)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
@@ -396,7 +396,7 @@ impl Nes {
 
                     // Palette selector
                     ui.horizontal(|ui| {
-                        ui.label("Palette:");
+                        ui.heading("Palette:");
                         for i in 0..8 {
                             if ui
                                 .selectable_label(
@@ -412,7 +412,7 @@ impl Nes {
 
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
-                            ui.label("Pattern Table 0");
+                            ui.heading("Pattern Table 0");
                             if let Some(tex) = &self.pattern_table_0_texture {
                                 ui.add(
                                     egui::Image::from_texture(tex)
@@ -422,7 +422,7 @@ impl Nes {
                         });
 
                         ui.vertical(|ui| {
-                            ui.label("Pattern Table 1");
+                            ui.heading("Pattern Table 1");
                             if let Some(tex) = &self.pattern_table_1_texture {
                                 ui.add(
                                     egui::Image::from_texture(tex)
@@ -442,7 +442,7 @@ impl Nes {
                         .show(ui, |ui| {
                             ui.set_min_width(ui.available_width());
                             ui.horizontal(|ui| {
-                                ui.label(RichText::new("#   Y  X  Tile Pal Pri H V").monospace());
+                                ui.heading(RichText::new("#   Y  X  Tile Pal Pri H V").monospace());
                             });
 
                             for i in 0..64 {
@@ -457,7 +457,7 @@ impl Nes {
                                 let flip_h = if attr & 0x40 != 0 { "Y" } else { "N" };
                                 let flip_v = if attr & 0x80 != 0 { "Y" } else { "N" };
 
-                                ui.label(
+                                ui.heading(
                                     RichText::new(format!(
                                         "{:02} {:02X} {:02X} {:02X}  {}  {}  {} {}",
                                         i, y, x, tile, palette, priority, flip_h, flip_v
@@ -479,29 +479,31 @@ impl Nes {
                             let mask = self.cpu.bus.ppu.cpuReadImmutable(&self.cpu.bus.rom, 1);
                             let status = self.cpu.bus.ppu.cpuReadImmutable(&self.cpu.bus.rom, 2);
 
-                            ui.label(RichText::new(format!("PPUCTRL: ${:02X}", ctrl)).monospace());
-                            ui.label(
+                            ui.heading(
+                                RichText::new(format!("PPUCTRL: ${:02X}", ctrl)).monospace(),
+                            );
+                            ui.heading(
                                 RichText::new(format!(
                                     "  NMI: {}",
                                     if ctrl & 0x80 != 0 { "ON" } else { "OFF" }
                                 ))
                                 .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "  Sprite size: {}",
                                     if ctrl & 0x20 != 0 { "8x16" } else { "8x8" }
                                 ))
                                 .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "  BG table: ${:04X}",
                                     if ctrl & 0x10 != 0 { 0x1000 } else { 0x0000 }
                                 ))
                                 .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "  Sprite table: ${:04X}",
                                     if ctrl & 0x08 != 0 { 0x1000 } else { 0x0000 }
@@ -510,15 +512,17 @@ impl Nes {
                             );
 
                             ui.add_space(4.0);
-                            ui.label(RichText::new(format!("PPUMASK: ${:02X}", mask)).monospace());
-                            ui.label(
+                            ui.heading(
+                                RichText::new(format!("PPUMASK: ${:02X}", mask)).monospace(),
+                            );
+                            ui.heading(
                                 RichText::new(format!(
                                     "  Show BG: {}",
                                     if mask & 0x08 != 0 { "ON" } else { "OFF" }
                                 ))
                                 .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "  Show Sprites: {}",
                                     if mask & 0x10 != 0 { "ON" } else { "OFF" }
@@ -527,58 +531,55 @@ impl Nes {
                             );
 
                             ui.add_space(4.0);
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!("PPUSTATUS: ${:02X}", status)).monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "  VBlank: {}",
                                     if status & 0x80 != 0 { "YES" } else { "NO" }
                                 ))
                                 .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "  Sprite 0 hit: {}",
                                     if status & 0x40 != 0 { "YES" } else { "NO" }
                                 ))
                                 .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "  Sprite overflow: {}",
                                     if status & 0x20 != 0 { "YES" } else { "NO" }
                                 ))
                                 .monospace(),
                             );
-                        });
+                            ui.separator();
 
-                        ui.separator();
-
-                        ui.vertical(|ui| {
                             ui.heading("Internal State");
                             ui.separator();
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!("Scanline: {}", self.cpu.bus.ppu.scanline))
                                     .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!("Pixel: {}", self.cpu.bus.ppu.pixel))
                                     .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!("v: ${:04X}", self.cpu.bus.ppu.v))
                                     .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!("t: ${:04X}", self.cpu.bus.ppu.t))
                                     .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!("x: ${:02X}", self.cpu.bus.ppu.x))
                                     .monospace(),
                             );
-                            ui.label(
+                            ui.heading(
                                 RichText::new(format!(
                                     "w: {}",
                                     if self.cpu.bus.ppu.w { "2nd" } else { "1st" }
@@ -593,10 +594,10 @@ impl Nes {
                     // Palette RAM
                     ui.heading("Palette RAM");
                     ui.separator();
-                    ui.label("Background Palettes:");
+                    ui.heading("Background Palettes:");
                     for pal in 0..4 {
                         ui.horizontal(|ui| {
-                            ui.label(format!("{}:", pal));
+                            ui.heading(format!("{}:", pal));
                             for col in 0..4 {
                                 let addr = pal * 4 + col;
                                 let nes_color = self.cpu.bus.ppu.palette_ram[addr];
@@ -607,7 +608,7 @@ impl Nes {
                                     egui::Sense::hover(),
                                 );
                                 ui.painter().rect_filled(rect, 0.0, rgb_color);
-                                ui.label(
+                                ui.heading(
                                     RichText::new(format!("${:02X}", nes_color))
                                         .monospace()
                                         .small(),
@@ -617,10 +618,10 @@ impl Nes {
                     }
 
                     ui.add_space(4.0);
-                    ui.label("Sprite Palettes:");
+                    ui.heading("Sprite Palettes:");
                     for pal in 0..4 {
                         ui.horizontal(|ui| {
-                            ui.label(format!("{}:", pal + 4));
+                            ui.heading(format!("{}:", pal + 4));
                             for col in 0..4 {
                                 let addr = 0x10 + pal * 4 + col;
                                 let nes_color = self.cpu.bus.ppu.palette_ram[addr & 0x1F];
@@ -631,7 +632,7 @@ impl Nes {
                                     egui::Sense::hover(),
                                 );
                                 ui.painter().rect_filled(rect, 0.0, rgb_color);
-                                ui.label(
+                                ui.heading(
                                     RichText::new(format!("${:02X}", nes_color))
                                         .monospace()
                                         .small(),
