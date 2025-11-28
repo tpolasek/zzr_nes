@@ -735,10 +735,11 @@ impl Ppu {
     }
 
     pub fn tick(&mut self, rom: &Rom) {
+        /*
         if self.scanline == 0 && self.pixel == 1 {
             println!(
-                "Scanline 0 start: v={:04X}, t={:04X}, x={}, w={}, 
-  ctrl={:02X}, mask={:02X}",
+                "Scanline 0 start: v={:04X}, t={:04X}, x={}, w={},
+        ctrl={:02X}, mask={:02X}",
                 self.v, self.t, self.x, self.w, self.reg_ctrl, self.reg_mask
             );
             println!(
@@ -746,13 +747,26 @@ impl Ppu {
                 self.bg_pattern_shift_low, self.bg_pattern_shift_high
             );
         }
+        */
 
         let rendering_enabled = self.is_rendering_enabled();
+
+        // Shift registers and tile fetching (happens on visible AND pre-render scanlines)
+        if (self.scanline < 240 || self.scanline == 261) && rendering_enabled {
+            // Shift registers during visible pixels (1-256) and prefetch cycles (321-336)
+            // IMPORTANT: This must happen BEFORE rendering the pixel
+            if (self.pixel >= 1 && self.pixel <= 256) || (self.pixel >= 321 && self.pixel <= 336) {
+                self.bg_pattern_shift_low <<= 1;
+                self.bg_pattern_shift_high <<= 1;
+                self.bg_palette_shift_low <<= 1;
+                self.bg_palette_shift_high <<= 1;
+            }
+        }
 
         // Visible scanlines (0-239)
         if self.scanline < 240 {
             if self.pixel > 0 && self.pixel <= 256 {
-                // RENDER PIXEL
+                // RENDER PIXEL (after shifting)
                 if rendering_enabled {
                     // Get background pixel
                     let (bg_pixel, bg_palette) = self.get_background_pixel();
@@ -805,16 +819,8 @@ impl Ppu {
             }
         }
 
-        // Shift registers and tile fetching (happens on visible AND pre-render scanlines)
+        // Tile fetching (happens on visible AND pre-render scanlines)
         if (self.scanline < 240 || self.scanline == 261) && rendering_enabled {
-            // Shift registers during visible pixels (1-256) and prefetch cycles (321-336)
-            if (self.pixel >= 1 && self.pixel <= 256) || (self.pixel >= 321 && self.pixel <= 336) {
-                self.bg_pattern_shift_low <<= 1;
-                self.bg_pattern_shift_high <<= 1;
-                self.bg_palette_shift_low <<= 1;
-                self.bg_palette_shift_high <<= 1;
-            }
-
             // Background tile fetching (8 cycles per tile)
             // Fetches happen during visible area (1-256) and prefetch (321-336)
             if (self.pixel >= 1 && self.pixel <= 256) || (self.pixel >= 321 && self.pixel <= 336) {
