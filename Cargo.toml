@@ -14,6 +14,7 @@ rand = "0.8.1"
 console = "0.14.0"
 eframe = "0.24"
 egui = "0.24"
+cpal = "0.15"
 
 [profile.release]
 debug = true
