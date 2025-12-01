@@ -1,3 +1,5 @@
+mod apu;
+mod audio_output;
 mod bus;
 mod controller;
 mod cpu;

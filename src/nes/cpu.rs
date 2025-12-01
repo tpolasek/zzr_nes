@@ -1620,6 +1620,9 @@ impl Cpu {
         self.bus.ppu.tick(&self.bus.rom);
         self.bus.ppu.tick(&self.bus.rom);
         self.bus.ppu.tick(&self.bus.rom);
+
+        // Clock the APU once per CPU cycle
+        self.bus.apu.clock();
     }
 
     fn write_value(&mut self, value: u8) {

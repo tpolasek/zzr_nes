@@ -1,3 +1,4 @@
+use crate::nes::apu::Apu;
 use crate::nes::controller::Controller;
 use crate::nes::ppu::Ppu;
 use crate::nes::ram2k::Ram2k;
@@ -10,6 +11,7 @@ pub struct Bus {
     pub controller: Controller,
     pub rom: Rom,
     pub ppu: Ppu,
+    pub apu: Apu,
     pub dma_cycles: u16,
 }
 
@@ -23,6 +25,7 @@ impl Bus {
             controller: Controller::new(),
             rom: Rom::new(),
             ppu: Ppu::new(),
+            apu: Apu::new(),
             dma_cycles: 0,
         }
     }
@@ -62,7 +65,7 @@ impl Bus {
             }
             0x4000..=0x4013 => {
                 // APU
-                return 0;
+                return self.apu.read_register(location);
             }
             0x4014 => {
                 // OAMDMA
@@ -70,7 +73,7 @@ impl Bus {
             }
             0x4015 => {
                 // SND_CHN
-                return 0;
+                return self.apu.read_register(location);
             }
             0x4016 => {
                 // Controller 1
@@ -109,19 +112,22 @@ impl Bus {
             }
             0x4000..=0x4013 => {
                 // APU
+                self.apu.write_register(location, value);
             }
             0x4014 => {
                 self.OAMDMA_write(value);
             }
             0x4015 => {
                 // SND_CHN
+                self.apu.write_register(location, value);
             }
             0x4016 => {
                 // Controller 1
                 self.controller.write(value);
             }
             0x4017 => {
-                // Controller 2
+                // Frame counter
+                self.apu.write_register(location, value);
             }
             0x4018..=0x401F => {
                 //Unused APU and I/O functionality

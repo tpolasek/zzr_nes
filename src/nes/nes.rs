@@ -5,6 +5,7 @@ use std::{thread, time};
 This file contains the GUI Debugger implementation and it is also where we execute the emulator.
 */
 
+use crate::nes::audio_output::AudioOutput;
 use crate::nes::controller::Button;
 use crate::nes::cpu::Cpu;
 use crate::nes::cpu::Opcode;
@@ -38,6 +39,7 @@ pub struct Nes {
     pattern_table_0_texture: Option<TextureHandle>,
     pattern_table_1_texture: Option<TextureHandle>,
     nametable_texture: Option<TextureHandle>,
+    _audio_output: Option<AudioOutput>,
 }
 
 impl Nes {
@@ -53,6 +55,19 @@ impl Nes {
         let disasm: Vec<GUIInstruction> = Vec::new();
 
         let stack_data: Vec<String> = Vec::new();
+
+        // Set up audio output
+        let audio_buffer = cpu.bus.apu.get_audio_buffer();
+        let audio_output = match AudioOutput::new(audio_buffer) {
+            Ok(output) => {
+                println!("Audio output initialized successfully");
+                Some(output)
+            }
+            Err(e) => {
+                eprintln!("Failed to initialize audio output: {}", e);
+                None
+            }
+        };
 
         Self {
             cpu,
@@ -74,6 +89,7 @@ impl Nes {
             pattern_table_0_texture: None,
             pattern_table_1_texture: None,
             nametable_texture: None,
+            _audio_output: audio_output,
         }
     }
 
@@ -886,9 +902,14 @@ impl App for Nes {
             )));
 
             ui.add_space(8.0);
-            ui.heading("CPU Info");
+            ui.heading("Debug Info");
             ui.separator();
-            ui.heading(format!("Cycle: {}", self.cpu.tick_count as usize));
+            ui.heading(format!("CPU Cycle: {}", self.cpu.tick_count as usize));
+            ui.heading(format!(
+                "Frame: {}",
+                self.cpu.bus.ppu.frame_counter as usize
+            ));
+
             ui.add_space(8.0);
             ui.heading("CPU Stack ($0100-$01FF)");
             ui.separator();
