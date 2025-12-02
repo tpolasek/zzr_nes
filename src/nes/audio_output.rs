@@ -1,5 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 pub struct AudioOutput {
@@ -7,7 +8,7 @@ pub struct AudioOutput {
 }
 
 impl AudioOutput {
-    pub fn new(audio_buffer: Arc<Mutex<Vec<f32>>>) -> Result<Self, String> {
+    pub fn new(audio_buffer: Arc<Mutex<VecDeque<f32>>>) -> Result<Self, String> {
         let host = cpal::default_host();
 
         let device = host
@@ -35,7 +36,7 @@ impl AudioOutput {
     fn build_stream<T>(
         device: &Device,
         config: &StreamConfig,
-        audio_buffer: Arc<Mutex<Vec<f32>>>,
+        audio_buffer: Arc<Mutex<VecDeque<f32>>>,
     ) -> Result<Stream, String>
     where
         T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32>,
@@ -56,17 +57,13 @@ impl AudioOutput {
         Ok(stream)
     }
 
-    fn write_data<T>(output: &mut [T], channels: usize, audio_buffer: &Arc<Mutex<Vec<f32>>>)
+    fn write_data<T>(output: &mut [T], channels: usize, audio_buffer: &Arc<Mutex<VecDeque<f32>>>)
     where
         T: cpal::Sample + cpal::FromSample<f32>,
     {
         if let Ok(mut buffer) = audio_buffer.lock() {
             for frame in output.chunks_mut(channels) {
-                let sample = if !buffer.is_empty() {
-                    buffer.remove(0)
-                } else {
-                    0.0 // Silence if buffer is empty
-                };
+                let sample = buffer.pop_front().unwrap_or(0.0);
 
                 // Write the same sample to all channels (mono to stereo/multi-channel)
                 for channel_sample in frame.iter_mut() {

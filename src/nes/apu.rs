@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 const CPU_FREQUENCY: f32 = 1_789_773.0; // NES CPU clock frequency in Hz
@@ -38,6 +39,10 @@ pub struct PulseChannel {
     envelope_counter: u8,
     envelope_divider: u8,
     envelope_volume: u8,
+
+    // Sweep internal state
+    sweep_divider: u8,
+    sweep_reload: bool,
 }
 
 impl PulseChannel {
@@ -59,6 +64,8 @@ impl PulseChannel {
             envelope_counter: 0,
             envelope_divider: 0,
             envelope_volume: 0,
+            sweep_divider: 0,
+            sweep_reload: false,
         }
     }
 
@@ -77,6 +84,7 @@ impl PulseChannel {
                 self.sweep_period = (value >> 4) & 0x07;
                 self.sweep_negate = (value & 0x08) != 0;
                 self.sweep_shift = value & 0x07;
+                self.sweep_reload = true;
             }
             2 => {
                 // $4002/$4006 - Timer low 8 bits
@@ -94,7 +102,7 @@ impl PulseChannel {
 
                 // Reset sequence and envelope
                 self.sequence_position = 0;
-                self.envelope_counter = self.volume;
+                self.envelope_counter = 15;
             }
             _ => {}
         }
@@ -108,7 +116,7 @@ impl PulseChannel {
     }
 
     pub fn is_active(&self) -> bool {
-        self.enabled && self.length_counter > 0 && self.timer >= 8
+        self.enabled && self.length_counter > 0 && self.timer >= 8 && !self.is_sweep_muted()
     }
 
     pub fn clock(&mut self) {
@@ -146,22 +154,77 @@ impl PulseChannel {
         };
     }
 
-    pub fn output(&self) -> f32 {
+    pub fn clock_sweep(&mut self, is_pulse1: bool) {
+        // Calculate target period using right shift
+        let change_amount = self.timer >> self.sweep_shift;
+
+        let target_period = if self.sweep_negate {
+            if is_pulse1 {
+                // Pulse 1 uses ones' complement (add the complement)
+                self.timer.wrapping_sub(change_amount).wrapping_sub(1)
+            } else {
+                // Pulse 2 uses two's complement
+                self.timer.wrapping_sub(change_amount)
+            }
+        } else {
+            self.timer.wrapping_add(change_amount)
+        };
+
+        // Muting conditions
+        let is_muted = self.timer < 8 || target_period > 0x7FF;
+
+        // Update period if conditions are met
+        if self.sweep_divider == 0 && self.sweep_enabled && self.sweep_shift > 0 && !is_muted {
+            self.timer = target_period;
+        }
+
+        // Clock divider
+        if self.sweep_divider == 0 || self.sweep_reload {
+            self.sweep_divider = self.sweep_period;
+            self.sweep_reload = false;
+        } else {
+            self.sweep_divider -= 1;
+        }
+    }
+
+    fn is_sweep_muted(&self) -> bool {
+        if self.sweep_shift == 0 {
+            return false;
+        }
+
+        let change_amount = self.timer >> self.sweep_shift;
+        let target_period = if self.sweep_negate {
+            self.timer.wrapping_sub(change_amount)
+        } else {
+            self.timer.wrapping_add(change_amount)
+        };
+
+        self.timer < 8 || target_period > 0x7FF
+    }
+
+    pub fn output(&self) -> u8 {
         if !self.is_active() {
-            return 0.0;
+            return 0;
         }
 
         let duty_pattern = DUTY_CYCLES[self.duty as usize];
-        let amplitude = if duty_pattern[self.sequence_position as usize] == 1 {
-            self.envelope_volume as f32
+        if duty_pattern[self.sequence_position as usize] == 1 {
+            self.envelope_volume
         } else {
-            0.0
-        };
-
-        // Normalize to -1.0 to 1.0 range
-        (amplitude / 15.0) * 2.0 - 1.0
+            0
+        }
     }
 }
+
+// Pre-calculated nonlinear mixing lookup table
+// Formula: pulse_out = 95.88 / ((8128 / (pulse1 + pulse2)) + 100)
+// Index is pulse1 + pulse2 (range 0-30)
+const PULSE_MIXING_TABLE: [f32; 31] = [
+    0.0, 0.011609, 0.023010, 0.034207, 0.045207, 0.056016, 0.066639, 0.077080,
+    0.087345, 0.097437, 0.107362, 0.117123, 0.126724, 0.136169, 0.145461, 0.154604,
+    0.163602, 0.172458, 0.181175, 0.189757, 0.198207, 0.206528, 0.214723, 0.222794,
+    0.230745, 0.238578, 0.246296, 0.253901, 0.261396, 0.268784, 0.276066,
+];
 
 // NES length counter lookup table
 const LENGTH_TABLE: [u8; 32] = [
@@ -178,11 +241,15 @@ pub struct Apu {
     irq_inhibit: bool,
 
     // Audio output
-    pub audio_buffer: Arc<Mutex<Vec<f32>>>,
+    pub audio_buffer: Arc<Mutex<VecDeque<f32>>>,
 
     // Cycle tracking for audio sample generation
     cpu_cycles: u64,
     sample_counter: f32,
+
+    // Frame counter tracking
+    apu_cycles: u64,
+    frame_counter_reset: bool,
 }
 
 impl Apu {
@@ -192,13 +259,15 @@ impl Apu {
             pulse2: PulseChannel::new(),
             frame_counter_mode: false,
             irq_inhibit: false,
-            audio_buffer: Arc::new(Mutex::new(Vec::with_capacity(2048))),
+            audio_buffer: Arc::new(Mutex::new(VecDeque::with_capacity(2048))),
             cpu_cycles: 0,
             sample_counter: 0.0,
+            apu_cycles: 0,
+            frame_counter_reset: false,
         }
     }
 
-    pub fn get_audio_buffer(&self) -> Arc<Mutex<Vec<f32>>> {
+    pub fn get_audio_buffer(&self) -> Arc<Mutex<VecDeque<f32>>> {
         Arc::clone(&self.audio_buffer)
     }
 
@@ -219,6 +288,7 @@ impl Apu {
                 // Frame counter
                 self.frame_counter_mode = (value & 0x80) != 0;
                 self.irq_inhibit = (value & 0x40) != 0;
+                self.frame_counter_reset = true;
             }
             _ => {}
         }
@@ -247,8 +317,12 @@ impl Apu {
 
         // The APU runs at half the CPU speed for the pulse channels
         if self.cpu_cycles % 2 == 0 {
+            self.apu_cycles += 1;
             self.pulse1.clock();
             self.pulse2.clock();
+
+            // Clock the frame counter
+            self.clock_frame_counter();
         }
 
         // Generate audio samples
@@ -258,20 +332,24 @@ impl Apu {
         if self.sample_counter >= 1.0 {
             self.sample_counter -= 1.0;
 
-            // Mix the two pulse channels
-            let pulse1_out = self.pulse1.output();
-            let pulse2_out = self.pulse2.output();
+            // Get raw outputs (0-15 range)
+            let pulse1_out = self.pulse1.output() as usize;
+            let pulse2_out = self.pulse2.output() as usize;
 
-            // Simple mixing (average)
-            let mixed = (pulse1_out + pulse2_out) * 0.5;
+            // Apply nonlinear mixing using lookup table
+            let pulse_sum = pulse1_out + pulse2_out;
+            let mixed = PULSE_MIXING_TABLE[pulse_sum];
+
+            // Convert from 0.0-0.276 range to -1.0 to 1.0 for audio output
+            let mixed = (mixed - 0.138) * 7.25;
 
             // Add to buffer
             if let Ok(mut buffer) = self.audio_buffer.lock() {
-                buffer.push(mixed);
+                buffer.push_back(mixed);
 
                 // Prevent buffer from growing too large
-                if buffer.len() > 4096 {
-                    buffer.drain(0..2048);
+                while buffer.len() > 4096 {
+                    buffer.pop_front();
                 }
             }
         }
@@ -287,5 +365,54 @@ impl Apu {
         self.clock_quarter_frame();
         self.pulse1.clock_length_counter();
         self.pulse2.clock_length_counter();
+        self.pulse1.clock_sweep(true);   // true = is pulse 1
+        self.pulse2.clock_sweep(false);  // false = is pulse 2
+    }
+
+    fn clock_frame_counter(&mut self) {
+        // Handle frame counter reset (write to $4017)
+        if self.frame_counter_reset {
+            self.apu_cycles = 0;
+            self.frame_counter_reset = false;
+
+            // In 5-step mode, immediately clock half frame
+            if self.frame_counter_mode {
+                self.clock_half_frame();
+            }
+            return;
+        }
+
+        if !self.frame_counter_mode {
+            // 4-step mode: quarter frames at 3728, 7456, 11185; half frames at 7456, 14914
+            match self.apu_cycles {
+                3728 => {
+                    self.clock_quarter_frame();
+                }
+                7456 => {
+                    self.clock_half_frame(); // This also calls quarter frame
+                }
+                11185 => {
+                    self.clock_quarter_frame();
+                }
+                14914 => {
+                    self.clock_half_frame();
+                    self.apu_cycles = 0; // Reset cycle counter
+                    // TODO: Generate IRQ if !self.irq_inhibit
+                }
+                _ => {}
+            }
+        } else {
+            // 5-step mode: quarter frames at 3728, 7456, 11185, 18640; half frame at 18640
+            match self.apu_cycles {
+                3728 | 7456 | 11185 => {
+                    self.clock_quarter_frame();
+                }
+                18640 => {
+                    self.clock_half_frame();
+                    self.apu_cycles = 0; // Reset cycle counter
+                }
+                _ => {}
+            }
+        }
     }
 }
